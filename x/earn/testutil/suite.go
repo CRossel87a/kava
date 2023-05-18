@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	"github.com/kava-labs/kava/app"
 	"github.com/kava-labs/kava/x/earn/keeper"
@@ -17,11 +18,11 @@ import (
 	savingskeeper "github.com/kava-labs/kava/x/savings/keeper"
 	savingstypes "github.com/kava-labs/kava/x/savings/types"
 
-	"github.com/cosmos/cosmos-sdk/simapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	banktestutil "github.com/cosmos/cosmos-sdk/x/bank/testutil"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -94,7 +95,7 @@ func (suite *Suite) SetupTest() {
 					sdk.MustNewDecFromStr("1"),
 				),
 				"usdx:usd",
-				sdk.NewInt(1000000),
+				sdkmath.NewInt(1000000),
 				hardtypes.NewInterestRateModel(
 					sdk.MustNewDecFromStr("0.05"),
 					sdk.MustNewDecFromStr("2"),
@@ -112,7 +113,7 @@ func (suite *Suite) SetupTest() {
 					sdk.MustNewDecFromStr("1"),
 				),
 				"busd:usd",
-				sdk.NewInt(1000000),
+				sdkmath.NewInt(1000000),
 				hardtypes.NewInterestRateModel(
 					sdk.MustNewDecFromStr("0.05"),
 					sdk.MustNewDecFromStr("2"),
@@ -130,7 +131,7 @@ func (suite *Suite) SetupTest() {
 					sdk.MustNewDecFromStr("1"),
 				),
 				"kava:usd",
-				sdk.NewInt(1000000),
+				sdkmath.NewInt(1000000),
 				hardtypes.NewInterestRateModel(
 					sdk.MustNewDecFromStr("0.05"),
 					sdk.MustNewDecFromStr("2"),
@@ -205,7 +206,7 @@ func (suite *Suite) GetEvents() sdk.Events {
 // AddCoinsToModule adds coins to the earn module account
 func (suite *Suite) AddCoinsToModule(amount sdk.Coins) {
 	// Does not use suite.BankKeeper.MintCoins as module account would not have permission to mint
-	err := simapp.FundModuleAccount(suite.BankKeeper, suite.Ctx, types.ModuleName, amount)
+	err := banktestutil.FundModuleAccount(suite.BankKeeper, suite.Ctx, types.ModuleName, amount)
 	suite.Require().NoError(err)
 }
 
@@ -227,7 +228,7 @@ func (suite *Suite) CreateAccount(initialBalance sdk.Coins, index int) authtypes
 	acc := ak.NewAccountWithAddress(suite.Ctx, addrs[index])
 	ak.SetAccount(suite.Ctx, acc)
 
-	err := simapp.FundAccount(suite.BankKeeper, suite.Ctx, acc.GetAddress(), initialBalance)
+	err := banktestutil.FundAccount(suite.BankKeeper, suite.Ctx, acc.GetAddress(), initialBalance)
 	suite.Require().NoError(err)
 
 	return acc
@@ -240,7 +241,7 @@ func (suite *Suite) NewAccountFromAddr(addr sdk.AccAddress, balance sdk.Coins) a
 	acc := ak.NewAccountWithAddress(suite.Ctx, addr)
 	ak.SetAccount(suite.Ctx, acc)
 
-	err := simapp.FundAccount(suite.BankKeeper, suite.Ctx, acc.GetAddress(), balance)
+	err := banktestutil.FundAccount(suite.BankKeeper, suite.Ctx, acc.GetAddress(), balance)
 	suite.Require().NoError(err)
 
 	return acc
@@ -375,7 +376,7 @@ func (suite *Suite) SavingsDepositAmountEqual(expected sdk.Coins) {
 
 // CreateNewUnbondedValidator creates a new validator in the staking module.
 // New validators are unbonded until the end blocker is run.
-func (suite *Suite) CreateNewUnbondedValidator(addr sdk.ValAddress, selfDelegation sdk.Int) stakingtypes.Validator {
+func (suite *Suite) CreateNewUnbondedValidator(addr sdk.ValAddress, selfDelegation sdkmath.Int) stakingtypes.Validator {
 	// Create a validator
 	err := suite.deliverMsgCreateValidator(suite.Ctx, addr, suite.NewBondCoin(selfDelegation))
 	suite.Require().NoError(err)
@@ -388,13 +389,13 @@ func (suite *Suite) CreateNewUnbondedValidator(addr sdk.ValAddress, selfDelegati
 }
 
 // NewBondCoin creates a Coin with the current staking denom.
-func (suite *Suite) NewBondCoin(amount sdk.Int) sdk.Coin {
+func (suite *Suite) NewBondCoin(amount sdkmath.Int) sdk.Coin {
 	stakingDenom := suite.App.GetStakingKeeper().BondDenom(suite.Ctx)
 	return sdk.NewCoin(stakingDenom, amount)
 }
 
 // CreateDelegation delegates tokens to a validator.
-func (suite *Suite) CreateDelegation(valAddr sdk.ValAddress, delegator sdk.AccAddress, amount sdk.Int) sdk.Dec {
+func (suite *Suite) CreateDelegation(valAddr sdk.ValAddress, delegator sdk.AccAddress, amount sdkmath.Int) sdk.Dec {
 	sk := suite.App.GetStakingKeeper()
 
 	stakingDenom := sk.BondDenom(suite.Ctx)
@@ -420,7 +421,7 @@ func (suite *Suite) deliverMsgCreateValidator(ctx sdk.Context, address sdk.ValAd
 		selfDelegation,
 		stakingtypes.Description{},
 		stakingtypes.NewCommissionRates(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec()),
-		sdk.NewInt(1e6),
+		sdkmath.NewInt(1e6),
 	)
 	if err != nil {
 		return err

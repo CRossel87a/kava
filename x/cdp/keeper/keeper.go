@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store/prefix"
+	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
@@ -14,7 +16,7 @@ import (
 
 // Keeper keeper for the cdp module
 type Keeper struct {
-	key             sdk.StoreKey
+	key             storetypes.StoreKey
 	cdc             codec.Codec
 	paramSubspace   paramtypes.Subspace
 	pricefeedKeeper types.PricefeedKeeper
@@ -26,7 +28,7 @@ type Keeper struct {
 }
 
 // NewKeeper creates a new keeper
-func NewKeeper(cdc codec.Codec, key sdk.StoreKey, paramstore paramtypes.Subspace, pfk types.PricefeedKeeper,
+func NewKeeper(cdc codec.Codec, key storetypes.StoreKey, paramstore paramtypes.Subspace, pfk types.PricefeedKeeper,
 	ak types.AuctionKeeper, bk types.BankKeeper, ack types.AccountKeeper, maccs map[string][]string,
 ) Keeper {
 	if !paramstore.HasKeyTable() {
@@ -118,7 +120,7 @@ func (k Keeper) IterateCdpsByCollateralRatio(ctx sdk.Context, collateralType str
 
 // GetSliceOfCDPsByRatioAndType returns a slice of cdps of size equal to the input cutoffCount
 // sorted by target ratio in ascending order (ie, the lowest collateral:debt ratio cdps are returned first)
-func (k Keeper) GetSliceOfCDPsByRatioAndType(ctx sdk.Context, cutoffCount sdk.Int, targetRatio sdk.Dec, collateralType string) (cdps types.CDPs) {
+func (k Keeper) GetSliceOfCDPsByRatioAndType(ctx sdk.Context, cutoffCount sdkmath.Int, targetRatio sdk.Dec, collateralType string) (cdps types.CDPs) {
 	count := sdk.ZeroInt()
 	k.IterateCdpsByCollateralRatio(ctx, collateralType, targetRatio, func(cdp types.CDP) bool {
 		cdps = append(cdps, cdp)
@@ -193,7 +195,7 @@ func (k Keeper) DecrementTotalPrincipal(ctx sdk.Context, collateralType string, 
 }
 
 // GetTotalPrincipal returns the total amount of principal that has been drawn for a particular collateral
-func (k Keeper) GetTotalPrincipal(ctx sdk.Context, collateralType, principalDenom string) (total sdk.Int) {
+func (k Keeper) GetTotalPrincipal(ctx sdk.Context, collateralType, principalDenom string) (total sdkmath.Int) {
 	store := prefix.NewStore(ctx.KVStore(k.key), types.PrincipalKeyPrefix)
 	bz := store.Get([]byte(collateralType + principalDenom))
 	if bz == nil {
@@ -207,7 +209,7 @@ func (k Keeper) GetTotalPrincipal(ctx sdk.Context, collateralType, principalDeno
 }
 
 // SetTotalPrincipal sets the total amount of principal that has been drawn for the input collateral
-func (k Keeper) SetTotalPrincipal(ctx sdk.Context, collateralType, principalDenom string, total sdk.Int) {
+func (k Keeper) SetTotalPrincipal(ctx sdk.Context, collateralType, principalDenom string, total sdkmath.Int) {
 	store := prefix.NewStore(ctx.KVStore(k.key), types.PrincipalKeyPrefix)
 	_, found := k.GetCollateral(ctx, collateralType)
 	if !found {

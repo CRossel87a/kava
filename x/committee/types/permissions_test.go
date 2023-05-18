@@ -7,10 +7,11 @@ import (
 
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	govv1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 	paramsproposal "github.com/cosmos/cosmos-sdk/x/params/types/proposal"
 
 	"github.com/kava-labs/kava/x/committee/types"
+	communitytypes "github.com/kava-labs/kava/x/community/types"
 )
 
 func TestPackPermissions_Success(t *testing.T) {
@@ -38,6 +39,119 @@ func TestUnpackPermissions_Failure(t *testing.T) {
 	require.NoError(t, err)
 	_, err = types.UnpackPermissions([]*codectypes.Any{vote})
 	require.Error(t, err)
+}
+
+func TestCommunityCDPRepayDebtPermission_Allows(t *testing.T) {
+	permission := types.CommunityCDPRepayDebtPermission{}
+	testcases := []struct {
+		name     string
+		proposal types.PubProposal
+		allowed  bool
+	}{
+		{
+			name: "allowed for correct proposal",
+			proposal: communitytypes.NewCommunityCDPRepayDebtProposal(
+				"repay x/community cdp debt",
+				"repays debt on a cdp position",
+				"collateral-type",
+				sdk.NewInt64Coin("ukava", 1e10),
+			),
+			allowed: true,
+		},
+		{
+			name:     "fails for nil proposal",
+			proposal: nil,
+			allowed:  false,
+		},
+		{
+			name: "fails for wrong proposal",
+			proposal: newTestParamsChangeProposalWithChanges([]paramsproposal.ParamChange{
+				{Subspace: "cdp", Key: "DebtThreshold", Value: `test`},
+			}),
+			allowed: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.allowed, permission.Allows(sdk.Context{}, nil, tc.proposal))
+		})
+	}
+}
+
+func TestCommunityPoolLendWithdrawPermission_Allows(t *testing.T) {
+	permission := types.CommunityPoolLendWithdrawPermission{}
+	testcases := []struct {
+		name     string
+		proposal types.PubProposal
+		allowed  bool
+	}{
+		{
+			name: "allowed for correct proposal",
+			proposal: communitytypes.NewCommunityPoolLendWithdrawProposal(
+				"withdraw lend position",
+				"this fake proposal withdraws a lend position for the community pool",
+				sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(1e10))),
+			),
+			allowed: true,
+		},
+		{
+			name:     "fails for nil proposal",
+			proposal: nil,
+			allowed:  false,
+		},
+		{
+			name: "fails for wrong proposal",
+			proposal: newTestParamsChangeProposalWithChanges([]paramsproposal.ParamChange{
+				{Subspace: "cdp", Key: "DebtThreshold", Value: `test`},
+			}),
+			allowed: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.allowed, permission.Allows(sdk.Context{}, nil, tc.proposal))
+		})
+	}
+}
+
+func TestCommunityCDPWithdrawCollateralPermission_Allows(t *testing.T) {
+	permission := types.CommunityCDPWithdrawCollateralPermission{}
+	testcases := []struct {
+		name     string
+		proposal types.PubProposal
+		allowed  bool
+	}{
+		{
+			name: "allowed for correct proposal",
+			proposal: communitytypes.NewCommunityCDPWithdrawCollateralProposal(
+				"withdraw x/community cdp collateral",
+				"yes",
+				"collateral-type",
+				sdk.NewInt64Coin("ukava", 1e10),
+			),
+			allowed: true,
+		},
+		{
+			name:     "fails for nil proposal",
+			proposal: nil,
+			allowed:  false,
+		},
+		{
+			name: "fails for wrong proposal",
+			proposal: newTestParamsChangeProposalWithChanges([]paramsproposal.ParamChange{
+				{Subspace: "cdp", Key: "DebtThreshold", Value: `test`},
+			}),
+			allowed: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.allowed, permission.Allows(sdk.Context{}, nil, tc.proposal))
+		})
+	}
 }
 
 func TestParamsChangePermission_SimpleParamsChange_Allows(t *testing.T) {
@@ -161,7 +275,7 @@ func TestParamsChangePermission_SimpleParamsChange_Allows(t *testing.T) {
 		{
 			name:          "not allowed (mismatched pubproposal type)",
 			permission:    testPermission,
-			pubProposal:   govtypes.NewTextProposal("A Title", "A description of this proposal."),
+			pubProposal:   govv1beta1.NewTextProposal("A Title", "A description of this proposal."),
 			expectAllowed: false,
 		},
 		{

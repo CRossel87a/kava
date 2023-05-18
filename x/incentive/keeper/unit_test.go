@@ -5,8 +5,10 @@ import (
 	"strings"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store"
+	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
@@ -27,12 +29,12 @@ import (
 )
 
 // NewTestContext sets up a basic context with an in-memory db
-func NewTestContext(requiredStoreKeys ...sdk.StoreKey) sdk.Context {
+func NewTestContext(requiredStoreKeys ...storetypes.StoreKey) sdk.Context {
 	memDB := db.NewMemDB()
 	cms := store.NewCommitMultiStore(memDB)
 
 	for _, key := range requiredStoreKeys {
-		cms.MountStoreWithDB(key, sdk.StoreTypeIAVL, nil)
+		cms.MountStoreWithDB(key, storetypes.StoreTypeIAVL, nil)
 	}
 
 	if err := cms.LoadLatestVersion(); err != nil {
@@ -50,7 +52,7 @@ type unitTester struct {
 	ctx    sdk.Context
 
 	cdc               codec.Codec
-	incentiveStoreKey sdk.StoreKey
+	incentiveStoreKey storetypes.StoreKey
 }
 
 func (suite *unitTester) SetupSuite() {
@@ -141,7 +143,7 @@ func (suite *unitTester) storeEarnClaim(claim types.EarnClaim) {
 
 type TestKeeperBuilder struct {
 	cdc           codec.Codec
-	key           sdk.StoreKey
+	key           storetypes.StoreKey
 	paramSubspace types.ParamSubspace
 	accountKeeper types.AccountKeeper
 	bankKeeper    types.BankKeeper
@@ -255,38 +257,38 @@ func (subspace *fakeParamSubspace) WithKeyTable(paramtypes.KeyTable) paramtypes.
 // fakeSwapKeeper is a stub swap keeper.
 // It can be used to return values to the incentive keeper without having to initialize a full swap keeper.
 type fakeSwapKeeper struct {
-	poolShares    map[string]sdk.Int
-	depositShares map[string](map[string]sdk.Int)
+	poolShares    map[string]sdkmath.Int
+	depositShares map[string](map[string]sdkmath.Int)
 }
 
 var _ types.SwapKeeper = newFakeSwapKeeper()
 
 func newFakeSwapKeeper() *fakeSwapKeeper {
 	return &fakeSwapKeeper{
-		poolShares:    map[string]sdk.Int{},
-		depositShares: map[string](map[string]sdk.Int){},
+		poolShares:    map[string]sdkmath.Int{},
+		depositShares: map[string](map[string]sdkmath.Int){},
 	}
 }
 
-func (k *fakeSwapKeeper) addPool(id string, shares sdk.Int) *fakeSwapKeeper {
+func (k *fakeSwapKeeper) addPool(id string, shares sdkmath.Int) *fakeSwapKeeper {
 	k.poolShares[id] = shares
 	return k
 }
 
-func (k *fakeSwapKeeper) addDeposit(poolID string, depositor sdk.AccAddress, shares sdk.Int) *fakeSwapKeeper {
+func (k *fakeSwapKeeper) addDeposit(poolID string, depositor sdk.AccAddress, shares sdkmath.Int) *fakeSwapKeeper {
 	if k.depositShares[poolID] == nil {
-		k.depositShares[poolID] = map[string]sdk.Int{}
+		k.depositShares[poolID] = map[string]sdkmath.Int{}
 	}
 	k.depositShares[poolID][depositor.String()] = shares
 	return k
 }
 
-func (k *fakeSwapKeeper) GetPoolShares(_ sdk.Context, poolID string) (sdk.Int, bool) {
+func (k *fakeSwapKeeper) GetPoolShares(_ sdk.Context, poolID string) (sdkmath.Int, bool) {
 	shares, ok := k.poolShares[poolID]
 	return shares, ok
 }
 
-func (k *fakeSwapKeeper) GetDepositorSharesAmount(_ sdk.Context, depositor sdk.AccAddress, poolID string) (sdk.Int, bool) {
+func (k *fakeSwapKeeper) GetDepositorSharesAmount(_ sdk.Context, depositor sdk.AccAddress, poolID string) (sdkmath.Int, bool) {
 	shares, found := k.depositShares[poolID][depositor.String()]
 	return shares, found
 }
@@ -381,12 +383,12 @@ func (k *fakeStakingKeeper) addBondedTokens(amount int64) *fakeStakingKeeper {
 	// add a validator with all the tokens
 	k.validators = append(k.validators, stakingtypes.Validator{
 		Status: stakingtypes.Bonded,
-		Tokens: sdk.NewInt(amount),
+		Tokens: sdkmath.NewInt(amount),
 	})
 	return k
 }
 
-func (k *fakeStakingKeeper) TotalBondedTokens(_ sdk.Context) sdk.Int {
+func (k *fakeStakingKeeper) TotalBondedTokens(_ sdk.Context) sdkmath.Int {
 	total := sdk.ZeroInt()
 	for _, val := range k.validators {
 		if val.GetStatus() == stakingtypes.Bonded {
@@ -423,7 +425,7 @@ func (k *fakeStakingKeeper) GetValidatorDelegations(_ sdk.Context, valAddr sdk.V
 // It can be used to return values to the incentive keeper without having to initialize a full cdp keeper.
 type fakeCDPKeeper struct {
 	interestFactor *sdk.Dec
-	totalPrincipal sdk.Int
+	totalPrincipal sdkmath.Int
 }
 
 var _ types.CdpKeeper = newFakeCDPKeeper()
@@ -440,7 +442,7 @@ func (k *fakeCDPKeeper) addInterestFactor(f sdk.Dec) *fakeCDPKeeper {
 	return k
 }
 
-func (k *fakeCDPKeeper) addTotalPrincipal(p sdk.Int) *fakeCDPKeeper {
+func (k *fakeCDPKeeper) addTotalPrincipal(p sdkmath.Int) *fakeCDPKeeper {
 	k.totalPrincipal = p
 	return k
 }
@@ -452,7 +454,7 @@ func (k *fakeCDPKeeper) GetInterestFactor(_ sdk.Context, collateralType string) 
 	return sdk.Dec{}, false
 }
 
-func (k *fakeCDPKeeper) GetTotalPrincipal(_ sdk.Context, collateralType string, principalDenom string) sdk.Int {
+func (k *fakeCDPKeeper) GetTotalPrincipal(_ sdk.Context, collateralType string, principalDenom string) sdkmath.Int {
 	return k.totalPrincipal
 }
 
@@ -537,7 +539,7 @@ func (k *fakeEarnKeeper) IterateVaultRecords(
 // fakeLiquidKeeper is a stub liquid keeper.
 // It can be used to return values to the incentive keeper without having to initialize a full liquid keeper.
 type fakeLiquidKeeper struct {
-	derivatives     map[string]sdk.Int
+	derivatives     map[string]sdkmath.Int
 	lastRewardClaim map[string]time.Time
 }
 
@@ -545,7 +547,7 @@ var _ types.LiquidKeeper = newFakeLiquidKeeper()
 
 func newFakeLiquidKeeper() *fakeLiquidKeeper {
 	return &fakeLiquidKeeper{
-		derivatives:     map[string]sdk.Int{},
+		derivatives:     map[string]sdkmath.Int{},
 		lastRewardClaim: map[string]time.Time{},
 	}
 }
@@ -553,7 +555,7 @@ func newFakeLiquidKeeper() *fakeLiquidKeeper {
 func (k *fakeLiquidKeeper) addDerivative(
 	ctx sdk.Context,
 	denom string,
-	supply sdk.Int,
+	supply sdkmath.Int,
 ) *fakeLiquidKeeper {
 	k.derivatives[denom] = supply
 	k.lastRewardClaim[denom] = ctx.BlockTime()
@@ -603,7 +605,7 @@ func (k *fakeLiquidKeeper) CollectStakingRewardsByDenom(
 func (k *fakeLiquidKeeper) getRewardAmount(
 	ctx sdk.Context,
 	derivativeDenom string,
-) sdk.Int {
+) sdkmath.Int {
 	amt, found := k.derivatives[derivativeDenom]
 	if !found {
 		// No error
@@ -689,14 +691,14 @@ func (k *fakePricefeedKeeper) GetCurrentPrice(ctx sdk.Context, marketID string) 
 }
 
 type fakeBankKeeper struct {
-	supply map[string]sdk.Int
+	supply map[string]sdkmath.Int
 }
 
 var _ types.BankKeeper = newFakeBankKeeper()
 
 func newFakeBankKeeper() *fakeBankKeeper {
 	return &fakeBankKeeper{
-		supply: map[string]sdk.Int{},
+		supply: map[string]sdkmath.Int{},
 	}
 }
 

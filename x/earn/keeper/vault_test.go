@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"testing"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/kava-labs/kava/x/earn/testutil"
@@ -38,7 +39,7 @@ func (suite *vaultTestSuite) TestGetVaultTotalShares() {
 	vaultTotalShares, found := suite.Keeper.GetVaultTotalShares(suite.Ctx, vaultDenom)
 	suite.Require().True(found)
 
-	suite.Equal(depositAmount.Amount.ToDec(), vaultTotalShares.Amount)
+	suite.Equal(sdk.NewDecFromInt(depositAmount.Amount), vaultTotalShares.Amount)
 }
 
 func (suite *vaultTestSuite) TestGetVaultTotalShares_NotFound() {
@@ -55,7 +56,7 @@ func (suite *vaultTestSuite) TestGetVaultTotalValue() {
 
 	totalValue, err := suite.Keeper.GetVaultTotalValue(suite.Ctx, vaultDenom)
 	suite.Require().NoError(err)
-	suite.Equal(sdk.NewInt(0), totalValue.Amount)
+	suite.Equal(sdkmath.NewInt(0), totalValue.Amount)
 }
 
 func (suite *vaultTestSuite) TestGetVaultTotalValue_NotFound() {
@@ -109,8 +110,8 @@ func (suite *vaultTestSuite) TestGetVaultAccountSupplied() {
 	suite.Require().True(found)
 
 	// Account supply only includes the deposit from respective accounts
-	suite.Equal(deposit1Amount.Amount.ToDec(), vaultAcc1Supplied.Shares.AmountOf(vaultDenom))
-	suite.Equal(deposit1Amount.Amount.ToDec(), vaultAcc2Supplied.Shares.AmountOf(vaultDenom))
+	suite.Equal(sdk.NewDecFromInt(deposit1Amount.Amount), vaultAcc1Supplied.Shares.AmountOf(vaultDenom))
+	suite.Equal(sdk.NewDecFromInt(deposit1Amount.Amount), vaultAcc2Supplied.Shares.AmountOf(vaultDenom))
 }
 
 func (suite *vaultTestSuite) TestGetVaultAccountValue() {

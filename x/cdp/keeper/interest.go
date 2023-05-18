@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/kava-labs/kava/x/cdp/types"
@@ -46,8 +47,8 @@ func (k Keeper) AccumulateInterest(ctx sdk.Context, ctype string) error {
 		k.SetPreviousAccrualTime(ctx, ctype, ctx.BlockTime())
 		return nil
 	}
-	interestFactor := CalculateInterestFactor(borrowRateSpy, sdk.NewInt(timeElapsed))
-	interestAccumulated := (interestFactor.Mul(totalPrincipalPrior.ToDec())).RoundInt().Sub(totalPrincipalPrior)
+	interestFactor := CalculateInterestFactor(borrowRateSpy, sdkmath.NewInt(timeElapsed))
+	interestAccumulated := (interestFactor.Mul(sdk.NewDecFromInt(totalPrincipalPrior))).RoundInt().Sub(totalPrincipalPrior)
 	if interestAccumulated.IsZero() {
 		// in the case accumulated interest rounds to zero, exit early without updating accrual time
 		return nil
@@ -85,18 +86,18 @@ func (k Keeper) AccumulateInterest(ctx sdk.Context, ctype string) error {
 // CalculateInterestFactor calculates the simple interest scaling factor,
 // which is equal to: (per-second interest rate ** number of seconds elapsed)
 // Will return 1.000x, multiply by principal to get new principal with added interest
-func CalculateInterestFactor(perSecondInterestRate sdk.Dec, secondsElapsed sdk.Int) sdk.Dec {
+func CalculateInterestFactor(perSecondInterestRate sdk.Dec, secondsElapsed sdkmath.Int) sdk.Dec {
 	scalingFactorUint := sdk.NewUint(uint64(scalingFactor))
-	scalingFactorInt := sdk.NewInt(int64(scalingFactor))
+	scalingFactorInt := sdkmath.NewInt(int64(scalingFactor))
 
 	// Convert per-second interest rate to a uint scaled by 1e18
-	interestMantissa := sdk.NewUintFromBigInt(perSecondInterestRate.MulInt(scalingFactorInt).RoundInt().BigInt())
+	interestMantissa := sdkmath.NewUintFromBigInt(perSecondInterestRate.MulInt(scalingFactorInt).RoundInt().BigInt())
 
 	// Convert seconds elapsed to uint (*not scaled*)
-	secondsElapsedUint := sdk.NewUintFromBigInt(secondsElapsed.BigInt())
+	secondsElapsedUint := sdkmath.NewUintFromBigInt(secondsElapsed.BigInt())
 
 	// Calculate the interest factor as a uint scaled by 1e18
-	interestFactorMantissa := sdk.RelativePow(interestMantissa, secondsElapsedUint, scalingFactorUint)
+	interestFactorMantissa := sdkmath.RelativePow(interestMantissa, secondsElapsedUint, scalingFactorUint)
 
 	// Convert interest factor to an unscaled sdk.Dec
 	return sdk.NewDecFromBigInt(interestFactorMantissa.BigInt()).QuoInt(scalingFactorInt)
@@ -155,12 +156,12 @@ func (k Keeper) CalculateNewInterest(ctx sdk.Context, cdp types.CDP) sdk.Coin {
 	if cdpInterestFactor.Equal(sdk.OneDec()) {
 		return sdk.NewCoin(cdp.AccumulatedFees.Denom, sdk.ZeroInt())
 	}
-	accumulatedInterest := cdp.GetTotalPrincipal().Amount.ToDec().Mul(cdpInterestFactor).RoundInt().Sub(cdp.GetTotalPrincipal().Amount)
+	accumulatedInterest := sdk.NewDecFromInt(cdp.GetTotalPrincipal().Amount).Mul(cdpInterestFactor).RoundInt().Sub(cdp.GetTotalPrincipal().Amount)
 	return sdk.NewCoin(cdp.AccumulatedFees.Denom, accumulatedInterest)
 }
 
 // SynchronizeInterestForRiskyCDPs synchronizes the interest for the slice of cdps with the lowest collateral:debt ratio
-func (k Keeper) SynchronizeInterestForRiskyCDPs(ctx sdk.Context, slice sdk.Int, targetRatio sdk.Dec, collateralType string) error {
+func (k Keeper) SynchronizeInterestForRiskyCDPs(ctx sdk.Context, slice sdkmath.Int, targetRatio sdk.Dec, collateralType string) error {
 	cdps := k.GetSliceOfCDPsByRatioAndType(ctx, slice, targetRatio, collateralType)
 	for _, cdp := range cdps {
 		k.hooks.BeforeCDPModified(ctx, cdp)

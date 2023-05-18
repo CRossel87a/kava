@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/types/rest"
+	"github.com/kava-labs/kava/client/rest"
 
 	"github.com/kava-labs/kava/x/validator-vesting/types"
 )

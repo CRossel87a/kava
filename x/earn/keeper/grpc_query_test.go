@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -79,7 +80,7 @@ func (suite *grpcQueryTestSuite) TestVaults_ZeroSupply() {
 				IsPrivateVault:    false,
 				AllowedDepositors: nil,
 				TotalShares:       sdk.NewDec(0).String(),
-				TotalValue:        sdk.NewInt(0),
+				TotalValue:        sdkmath.NewInt(0),
 			},
 			res.Vault,
 		)
@@ -142,7 +143,7 @@ func (suite *grpcQueryTestSuite) TestVaults_WithSupply() {
 				Strategies:        []types.StrategyType{types.STRATEGY_TYPE_HARD},
 				IsPrivateVault:    false,
 				AllowedDepositors: nil,
-				TotalShares:       depositAmount.Amount.ToDec().String(),
+				TotalShares:       sdk.NewDecFromInt(depositAmount.Amount).String(),
 				TotalValue:        depositAmount.Amount,
 			},
 			{
@@ -150,7 +151,7 @@ func (suite *grpcQueryTestSuite) TestVaults_WithSupply() {
 				Strategies:        []types.StrategyType{types.STRATEGY_TYPE_SAVINGS},
 				IsPrivateVault:    false,
 				AllowedDepositors: nil,
-				TotalShares:       deposit2Amount.Amount.ToDec().String(),
+				TotalShares:       sdk.NewDecFromInt(deposit2Amount.Amount).String(),
 				TotalValue:        deposit2Amount.Amount,
 			},
 		},
@@ -204,7 +205,7 @@ func (suite *grpcQueryTestSuite) TestVaults_MixedSupply() {
 				Strategies:        []types.StrategyType{types.STRATEGY_TYPE_SAVINGS},
 				IsPrivateVault:    false,
 				AllowedDepositors: nil,
-				TotalShares:       depositAmount.Amount.ToDec().String(),
+				TotalShares:       sdk.NewDecFromInt(depositAmount.Amount).String(),
 				TotalValue:        depositAmount.Amount,
 			},
 		},
@@ -230,7 +231,7 @@ func (suite *grpcQueryTestSuite) TestDeposits() {
 	vault3Denom := fmt.Sprintf("bkava-%s", valAddr1.String())
 	vault4Denom := fmt.Sprintf("bkava-%s", valAddr2.String())
 
-	initialUkavaBalance := sdk.NewInt(1e9)
+	initialUkavaBalance := sdkmath.NewInt(1e9)
 	startBalance := sdk.NewCoins(
 		sdk.NewCoin("ukava", initialUkavaBalance),
 		sdk.NewInt64Coin(vault1Denom, 1000),
@@ -240,7 +241,7 @@ func (suite *grpcQueryTestSuite) TestDeposits() {
 		sdk.NewInt64Coin(vault4Denom, 1000),
 	)
 
-	delegateAmount := sdk.NewInt(100e6)
+	delegateAmount := sdkmath.NewInt(100e6)
 
 	suite.App.FundAccount(suite.Ctx, valAccAddr1, startBalance)
 	suite.App.FundAccount(suite.Ctx, valAccAddr2, startBalance)
@@ -300,7 +301,7 @@ func (suite *grpcQueryTestSuite) TestDeposits() {
 					Depositor: acc1.String(),
 					// Only includes specified deposit shares
 					Shares: types.NewVaultShares(
-						types.NewVaultShare(deposit1Amount.Denom, deposit1Amount.Amount.ToDec()),
+						types.NewVaultShare(deposit1Amount.Denom, sdk.NewDecFromInt(deposit1Amount.Amount)),
 					),
 					// Only the specified vault denom value
 					Value: sdk.NewCoins(deposit1Amount),
@@ -325,7 +326,7 @@ func (suite *grpcQueryTestSuite) TestDeposits() {
 					Depositor: acc2.String(),
 					// Only includes specified deposit shares
 					Shares: types.NewVaultShares(
-						types.NewVaultShare(deposit3Amount.Denom, deposit3Amount.Amount.ToDec()),
+						types.NewVaultShare(deposit3Amount.Denom, sdk.NewDecFromInt(deposit3Amount.Amount)),
 					),
 					// Only the specified vault denom value
 					Value: sdk.NewCoins(deposit3Amount),
@@ -349,7 +350,7 @@ func (suite *grpcQueryTestSuite) TestDeposits() {
 				Depositor: acc2.String(),
 				// Only includes specified deposit shares
 				Shares: types.NewVaultShares(
-					types.NewVaultShare(deposit3Amount.Denom, deposit3Amount.Amount.ToDec()),
+					types.NewVaultShare(deposit3Amount.Denom, sdk.NewDecFromInt(deposit3Amount.Amount)),
 				),
 				// Only the specified vault denom value
 				Value: sdk.NewCoins(
@@ -382,8 +383,8 @@ func (suite *grpcQueryTestSuite) TestDeposits() {
 				{
 					Depositor: acc1.String(),
 					Shares: types.NewVaultShares(
-						types.NewVaultShare(deposit1Amount.Denom, deposit1Amount.Amount.ToDec()),
-						types.NewVaultShare(deposit2Amount.Denom, deposit2Amount.Amount.ToDec()),
+						types.NewVaultShare(deposit1Amount.Denom, sdk.NewDecFromInt(deposit1Amount.Amount)),
+						types.NewVaultShare(deposit2Amount.Denom, sdk.NewDecFromInt(deposit2Amount.Amount)),
 					),
 					Value: sdk.NewCoins(deposit1Amount, deposit2Amount),
 				},
@@ -405,8 +406,8 @@ func (suite *grpcQueryTestSuite) TestDeposits() {
 				Depositor: acc2.String(),
 				Shares: types.VaultShares{
 					// Does not include non-bkava vaults
-					types.NewVaultShare(deposit4Amount.Denom, deposit4Amount.Amount.ToDec()),
-					types.NewVaultShare(deposit3Amount.Denom, deposit3Amount.Amount.ToDec()),
+					types.NewVaultShare(deposit4Amount.Denom, sdk.NewDecFromInt(deposit4Amount.Amount)),
+					types.NewVaultShare(deposit3Amount.Denom, sdk.NewDecFromInt(deposit3Amount.Amount)),
 				},
 				Value: sdk.Coins{
 					// Does not include non-bkava vaults
@@ -419,7 +420,7 @@ func (suite *grpcQueryTestSuite) TestDeposits() {
 		for i := range res.Deposits[0].Shares {
 			suite.Equal(
 				res.Deposits[0].Shares[i].Amount,
-				res.Deposits[0].Value[i].Amount.ToDec(),
+				sdk.NewDecFromInt(res.Deposits[0].Value[i].Amount),
 				"order of deposit value should match shares",
 			)
 		}
@@ -513,10 +514,10 @@ func (suite *grpcQueryTestSuite) TestDeposits_bKava() {
 		[]sdk.AccAddress{},
 	)
 
-	address1, derivatives1, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[0], sdk.NewInt(1e9))
-	address2, derivatives2, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[1], sdk.NewInt(1e9))
+	address1, derivatives1, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[0], sdkmath.NewInt(1e9))
+	address2, derivatives2, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[1], sdkmath.NewInt(1e9))
 
-	err := suite.App.FundAccount(suite.Ctx, address1, sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(1e9))))
+	err := suite.App.FundAccount(suite.Ctx, address1, sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(1e9))))
 	suite.Require().NoError(err)
 
 	// Slash the last validator to reduce the value of it's derivatives to test bkava to underlying token conversion.
@@ -628,7 +629,7 @@ func (suite *grpcQueryTestSuite) TestVault_bKava_Single() {
 			IsPrivateVault:    false,
 			AllowedDepositors: []string(nil),
 			TotalShares:       "100.000000000000000000",
-			TotalValue:        sdk.NewInt(100),
+			TotalValue:        sdkmath.NewInt(100),
 		},
 		res.Vault,
 	)
@@ -637,9 +638,9 @@ func (suite *grpcQueryTestSuite) TestVault_bKava_Single() {
 func (suite *grpcQueryTestSuite) TestVault_bKava_Aggregate() {
 	vaultDenom := "bkava"
 
-	address1, derivatives1, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[0], sdk.NewInt(1e9))
-	address2, derivatives2, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[1], sdk.NewInt(1e9))
-	address3, derivatives3, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[2], sdk.NewInt(1e9))
+	address1, derivatives1, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[0], sdkmath.NewInt(1e9))
+	address2, derivatives2, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[1], sdkmath.NewInt(1e9))
+	address3, derivatives3, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[2], sdkmath.NewInt(1e9))
 	// Slash the last validator to reduce the value of it's derivatives to test bkava to underlying token conversion.
 	// First call end block to bond validator to enable slashing.
 	staking.EndBlocker(suite.Ctx, suite.App.GetStakingKeeper())
@@ -790,8 +791,8 @@ func (suite *grpcQueryTestSuite) TestTotalSupply() {
 		{
 			name: "aggregates supply of bkava vaults accounting for slashing",
 			setup: func() {
-				address1, derivatives1, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[0], sdk.NewInt(1e9))
-				address2, derivatives2, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[1], sdk.NewInt(1e9))
+				address1, derivatives1, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[0], sdkmath.NewInt(1e9))
+				address2, derivatives2, _ := suite.createAccountWithDerivatives(testutil.TestBkavaDenoms[1], sdkmath.NewInt(1e9))
 
 				// bond validators
 				staking.EndBlocker(suite.Ctx, suite.App.GetStakingKeeper())
@@ -809,8 +810,8 @@ func (suite *grpcQueryTestSuite) TestTotalSupply() {
 			expectedSupply: sdk.NewCoins(
 				sdk.NewCoin(
 					"bkava",
-					sdk.NewIntFromUint64(1e9). // derivative 1
-									Add(sdk.NewInt(1e9).MulRaw(80).QuoRaw(100))), // derivative 2: original value * 80%
+					sdkmath.NewIntFromUint64(1e9). // derivative 1
+									Add(sdkmath.NewInt(1e9).MulRaw(80).QuoRaw(100))), // derivative 2: original value * 80%
 			),
 		},
 	}
@@ -830,7 +831,7 @@ func (suite *grpcQueryTestSuite) TestTotalSupply() {
 }
 
 // createUnbondedValidator creates an unbonded validator with the given amount of self-delegation.
-func (suite *grpcQueryTestSuite) createUnbondedValidator(address sdk.ValAddress, selfDelegation sdk.Coin, minSelfDelegation sdk.Int) error {
+func (suite *grpcQueryTestSuite) createUnbondedValidator(address sdk.ValAddress, selfDelegation sdk.Coin, minSelfDelegation sdkmath.Int) error {
 	msg, err := stakingtypes.NewMsgCreateValidator(
 		address,
 		ed25519.GenPrivKey().PubKey(),
@@ -850,12 +851,12 @@ func (suite *grpcQueryTestSuite) createUnbondedValidator(address sdk.ValAddress,
 
 // createAccountWithDerivatives creates an account with the given amount and denom of derivative token.
 // Internally, it creates a validator account and mints derivatives from the validator's self delegation.
-func (suite *grpcQueryTestSuite) createAccountWithDerivatives(denom string, amount sdk.Int) (sdk.AccAddress, sdk.Coin, sdk.Coins) {
+func (suite *grpcQueryTestSuite) createAccountWithDerivatives(denom string, amount sdkmath.Int) (sdk.AccAddress, sdk.Coin, sdk.Coins) {
 	valAddress, err := liquidtypes.ParseLiquidStakingTokenDenom(denom)
 	suite.Require().NoError(err)
 	address := sdk.AccAddress(valAddress)
 
-	remainingSelfDelegation := sdk.NewInt(1e6)
+	remainingSelfDelegation := sdkmath.NewInt(1e6)
 	selfDelegation := sdk.NewCoin(
 		suite.bondDenom(),
 		amount.Add(remainingSelfDelegation),

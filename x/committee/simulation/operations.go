@@ -136,7 +136,7 @@ func SimulateMsgSubmitProposal(cdc *codec.Codec, ak AccountKeeper, k keeper.Keep
 		// pick the voters
 		// num voters determined by whether the proposal should pass or not
 		numMembers := int64(len(selectedCommittee.GetMembers()))
-		majority := selectedCommittee.GetVoteThreshold().Mul(sdk.NewInt(numMembers).ToDec()).Ceil().TruncateInt64()
+		majority := selectedCommittee.GetVoteThreshold().Mul(sdk.NewDec(numMembers)).Ceil().TruncateInt64()
 
 		numVoters := r.Int63n(majority) // in interval [0, majority)
 		shouldPass := r.Float64() < proposalPassPercentage
@@ -154,7 +154,7 @@ func SimulateMsgSubmitProposal(cdc *codec.Codec, ak AccountKeeper, k keeper.Keep
 			}
 
 			// Valid vote types: 0, 1, 2
-			randInt, err := RandIntInclusive(r, sdk.ZeroInt(), sdk.NewInt(2))
+			randInt, err := RandIntInclusive(r, sdk.ZeroInt(), sdkmath.NewInt(2))
 			if err != nil {
 				return simulation.NoOpMsg(types.ModuleName), nil, fmt.Errorf("random vote type generation failed: %w", err)
 			}

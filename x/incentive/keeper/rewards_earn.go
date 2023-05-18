@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	earntypes "github.com/kava-labs/kava/x/earn/types"
@@ -34,8 +35,8 @@ func (k Keeper) AccumulateEarnRewards(ctx sdk.Context, rewardPeriod types.MultiR
 
 func GetProportionalRewardsPerSecond(
 	rewardPeriod types.MultiRewardPeriod,
-	totalBkavaSupply sdk.Int,
-	singleBkavaSupply sdk.Int,
+	totalBkavaSupply sdkmath.Int,
+	singleBkavaSupply sdkmath.Int,
 ) sdk.DecCoins {
 	// Rate per bkava-xxx = rewardsPerSecond * % of bkava-xxx
 	//                    = rewardsPerSecond * (bkava-xxx / total bkava)
@@ -50,9 +51,9 @@ func GetProportionalRewardsPerSecond(
 	}
 
 	for _, rewardCoin := range rewardPeriod.RewardsPerSecond {
-		scaledAmount := rewardCoin.Amount.ToDec().
-			Mul(singleBkavaSupply.ToDec()).
-			Quo(totalBkavaSupply.ToDec())
+		scaledAmount := sdk.NewDecFromInt(rewardCoin.Amount).
+			Mul(sdk.NewDecFromInt(singleBkavaSupply)).
+			Quo(sdk.NewDecFromInt(totalBkavaSupply))
 
 		newRate = newRate.Add(sdk.NewDecCoinFromDec(rewardCoin.Denom, scaledAmount))
 	}
@@ -179,7 +180,18 @@ func (k Keeper) collectDerivativeStakingRewards(ctx sdk.Context, collateralType 
 		// otherwise there's no validator or delegation yet
 		rewards = nil
 	}
-	return sdk.NewDecCoinsFromCoins(rewards...)
+
+	// Bug with NewDecCoinsFromCoins when calling passing 0 amount Coin, see
+	// https://github.com/cosmos/cosmos-sdk/pull/12903
+	// Fix is in Cosmos-SDK v0.47.0
+	var decCoins sdk.DecCoins
+	for _, coin := range rewards {
+		if coin.IsValid() {
+			decCoins = append(decCoins, sdk.NewDecCoinFromCoin(coin))
+		}
+	}
+
+	return decCoins
 }
 
 func (k Keeper) collectPerSecondRewards(

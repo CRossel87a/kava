@@ -3,178 +3,256 @@ package app
 import (
 	"fmt"
 
-	"github.com/cosmos/cosmos-sdk/baseapp"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	authz "github.com/cosmos/cosmos-sdk/x/authz"
+	authzkeeper "github.com/cosmos/cosmos-sdk/x/authz/keeper"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
-	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
-	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
-	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
+	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	upgradetypes "github.com/cosmos/cosmos-sdk/x/upgrade/types"
-	dbm "github.com/tendermint/tm-db"
+	evmtypes "github.com/evmos/ethermint/x/evm/types"
 
-	communitykeeper "github.com/kava-labs/kava/x/community/keeper"
+	committeekeeper "github.com/kava-labs/kava/x/committee/keeper"
+	committeetypes "github.com/kava-labs/kava/x/committee/types"
 	communitytypes "github.com/kava-labs/kava/x/community/types"
+	hardkeeper "github.com/kava-labs/kava/x/hard/keeper"
+	incentivekeeper "github.com/kava-labs/kava/x/incentive/keeper"
 )
 
 const (
-	MainnetUpgradeName = "v0.21.0"
-	TestnetUpgradeName = "v0.21.0-alpha.0"
+	MainnetUpgradeName = "v0.23.0"
+	TestnetUpgradeName = "v0.23.0-alpha.0"
+
+	MainnetStabilityCommitteeId = uint64(1)
+	TestnetStabilityCommitteeId = uint64(1)
 )
 
-func (app App) RegisterUpgradeHandlers(db dbm.DB) {
+func (app App) RegisterUpgradeHandlers() {
 	// register upgrade handler for mainnet
-	app.upgradeKeeper.SetUpgradeHandler(MainnetUpgradeName, MainnetUpgradeHandler(app))
-	// register upgrade handler for testnet
-	app.upgradeKeeper.SetUpgradeHandler(TestnetUpgradeName, TestnetUpgradeHandler(app))
+	app.upgradeKeeper.SetUpgradeHandler(MainnetUpgradeName,
+		func(ctx sdk.Context, plan upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
+			app.Logger().Info("running mainnet upgrade handler")
+
+			toVM, err := app.mm.RunMigrations(ctx, app.configurator, fromVM)
+			if err != nil {
+				return toVM, err
+			}
+
+			app.Logger().Info("move all community pool funds from x/distribution to x/community")
+			FundCommunityPoolModule(ctx, app.distrKeeper, app.bankKeeper, app)
+
+			app.Logger().Info("granting x/gov module account x/community module authz messages")
+			GrantGovCommunityPoolMessages(ctx, app.authzKeeper, app.accountKeeper)
+
+			app.Logger().Info(fmt.Sprintf(
+				"adding lend & cdp committee permissions to stability committee (id=%d)",
+				MainnetStabilityCommitteeId,
+			))
+			AddNewPermissionsToStabilityCommittee(ctx, app.committeeKeeper, MainnetStabilityCommitteeId)
+
+			app.Logger().Info(fmt.Sprintf(
+				"removing x/evm AllowedParamsChange from stability committee (id=%d)",
+				MainnetStabilityCommitteeId,
+			))
+			RemoveEVMCommitteePermissions(ctx, app.committeeKeeper, MainnetStabilityCommitteeId)
+
+			app.Logger().Info("enabling community pool incentive tracking")
+			EnableCommunityPoolIncentiveTracking(ctx, app.hardKeeper, app.incentiveKeeper)
+
+			return toVM, nil
+		},
+	)
+
+	// register upgrade handler for testnet. This only runs the module
+	// migrations, as testnet already ran the other upgrades in v0.22.0.
+	app.upgradeKeeper.SetUpgradeHandler(TestnetUpgradeName,
+		func(ctx sdk.Context, plan upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
+			app.Logger().Info("running testnet upgrade handler")
+
+			toVM, err := app.mm.RunMigrations(ctx, app.configurator, fromVM)
+			if err != nil {
+				return toVM, err
+			}
+
+			return toVM, nil
+		},
+	)
 
 	upgradeInfo, err := app.upgradeKeeper.ReadUpgradeInfoFromDisk()
 	if err != nil {
 		panic(err)
 	}
 
-	// MAINNET STORE CHANGES
-	// only the community module is added which has no store.
-	// therefore, no store migration is necessary for mainnet.
+	// note: no store updates
+	doUpgrade := upgradeInfo.Name == MainnetUpgradeName || upgradeInfo.Name == TestnetUpgradeName
+	if doUpgrade && !app.upgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
+		storeUpgrades := storetypes.StoreUpgrades{}
 
-	// TESTNET STORE CHANGES
-	// we must undo the store changes performed in the v0.20.0-alpha.0 upgrade handler.
-	if upgradeInfo.Name == TestnetUpgradeName && !app.upgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
-		storeUpgrades := storetypes.StoreUpgrades{
-			Added: []string{
-				minttypes.StoreKey,
-			},
-			Deleted: []string{
-				"kavamint",
-			},
-		}
-		// override the store loader to handle cleaning up bad testnet x/mint state
-		app.SetStoreLoader(TestnetStoreLoader(app, db, upgradeInfo.Height, &storeUpgrades))
-	}
-}
-
-// TestnetStoreLoader removes the previous iavl tree for the mint module, ensuring even store heights without
-// modifications to iavl to support non-consecutive versions and deletion of all nodes for a new tree at the upgrade height
-func TestnetStoreLoader(app App, db dbm.DB, upgradeHeight int64, storeUpgrades *storetypes.StoreUpgrades) baseapp.StoreLoader {
-	return func(ms sdk.CommitMultiStore) error {
-		// if this is the upgrade height, delete all remnant x/mint store versions to ensure we start from clean slate
-		if upgradeHeight == ms.LastCommitID().Version+1 {
-			app.Logger().Info("removing x/mint historic versions from store")
-			prefix := "s/k:" + minttypes.StoreKey + "/"
-
-			// The mint module iavl versioned tree is stored at "s/k:mint/"
-			prefixdb := dbm.NewPrefixDB(db, []byte(prefix))
-
-			itr, err := prefixdb.Iterator(nil, nil)
-			if err != nil {
-				return err
-			}
-
-			// Collect keys since deletion during iteration may cause issues
-			var keys [][]byte
-			for itr.Valid() {
-				keys = append(keys, itr.Key())
-				itr.Next()
-			}
-			itr.Close()
-
-			// Delete all keys and thus all history of the mint store iavl tree
-			for _, k := range keys {
-				prefixdb.Delete(k)
-			}
-		}
-
-		// run the standard upgrade handler, now starting at a clean state for the mint store key
 		// configure store loader that checks if version == upgradeHeight and applies store upgrades
-		return upgradetypes.UpgradeStoreLoader(upgradeHeight, storeUpgrades)(ms)
+		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, &storeUpgrades))
 	}
 }
 
-// MainnetUpgradeHandler does nothing. No state changes are necessary on mainnet because v0.20.0 was
-// never released and its upgrade handler was never run.
-func MainnetUpgradeHandler(app App) upgradetypes.UpgradeHandler {
-	return func(ctx sdk.Context, plan upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
-		// no-op
-		app.Logger().Info("running mainnet upgrade handler")
-		return app.mm.RunMigrations(ctx, app.configurator, fromVM)
+// GrantGovCommunityPoolMessages grants x/gov module account access to submit x/authz messages from the community pool module account.
+func GrantGovCommunityPoolMessages(
+	ctx sdk.Context,
+	authzKeeper authzkeeper.Keeper,
+	accountKeeper authkeeper.AccountKeeper,
+) {
+	communityAddr := accountKeeper.GetModuleAddress(communitytypes.ModuleName)
+	govAddr := accountKeeper.GetModuleAddress(govtypes.ModuleName)
+	allowedMsgs := GetCommunityPoolAllowedMsgs()
+	for _, msg := range allowedMsgs {
+		auth := authz.NewGenericAuthorization(msg)
+		if err := authzKeeper.SaveGrant(ctx, govAddr, communityAddr, auth, nil); err != nil {
+			panic(fmt.Errorf("failed to grant msg %s to x/gov account: %w", msg, err))
+		}
 	}
 }
 
-// TestnetUpgradeHandler is the inverse of the v0.20.0-alpha.0 upgrade handler that was run on public
-// testnet. It reverts the state changes to bring the chain back to its v0.19.0 state, which is expected
-// in this upgrade.
-// See original handler here: https://github.com/Kava-Labs/kava/blob/v0.20.0-alpha.0/app/upgrades.go#L65
-func TestnetUpgradeHandler(app App) upgradetypes.UpgradeHandler {
-	return func(ctx sdk.Context, plan upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
-		app.Logger().Info("running testnet upgrade handler")
+// MoveCommunityPoolFunds takes the full balance of the original community pool (the auth fee pool)
+// and transfers them to the new community pool (the x/community module account)
+func FundCommunityPoolModule(
+	ctx sdk.Context,
+	distKeeper distrkeeper.Keeper,
+	bankKeeper bankkeeper.Keeper,
+	app App,
+) {
+	// get balance of original community pool
+	balance, leftoverDust := distKeeper.GetFeePoolCommunityCoins(ctx).TruncateDecimal()
+	app.Logger().Info(fmt.Sprintf("community pool balance: %v, dust: %v", balance, leftoverDust))
 
-		// move community pool funds back to community pool from community module.
-		app.Logger().Info("migrating community pool funds")
-		MigrateCommunityPoolFunds(ctx, app.accountKeeper, app.communityKeeper, app.distrKeeper)
+	// the balance of the community fee pool is held by the distribution module.
+	// transfer whole pool balance from distribution module to new community pool module account
+	err := bankKeeper.SendCoinsFromModuleToModule(
+		ctx,
+		distrtypes.ModuleName,
+		communitytypes.ModuleAccountName,
+		balance,
+	)
+	if err != nil {
+		panic(fmt.Errorf(
+			"failed to transfer community pool funds to new community pool module account: %w",
+			err,
+		))
+	}
 
-		// reenable community tax
-		app.Logger().Info("re-enabling community tax")
-		ReenableCommunityTax(ctx, app.distrKeeper)
+	// make sure x/distribution knows that there're no funds in the community pool.
+	// we keep the leftover decimal change in the account to ensure all funds are accounted for.
+	feePool := distKeeper.GetFeePool(ctx)
+	feePool.CommunityPool = leftoverDust
+	distKeeper.SetFeePool(ctx, feePool)
+}
 
-		// remove mint from the version map to ensure InitGenesis for x/mint is run
-		delete(fromVM, "mint")
+// AddNewPermissionsToStabilityCommittee adds the following permissions to the committee with the passed in id:
+// - CommunityCDPRepayDebtPermission
+// - CommunityPoolLendWithdrawPermission
+// - CommunityCDPWithdrawCollateralPermission
+func AddNewPermissionsToStabilityCommittee(ctx sdk.Context, committeeKeeper committeekeeper.Keeper, committeeId uint64) {
+	// get committee
+	comm, found := committeeKeeper.GetCommittee(ctx, committeeId)
+	if !found {
+		panic(fmt.Sprintf("expected to find committee with id %d but found none", committeeId))
+	}
+	// set new permissions
+	perms := comm.GetPermissions()
+	perms = append(perms,
+		&committeetypes.CommunityCDPRepayDebtPermission{},
+		&committeetypes.CommunityPoolLendWithdrawPermission{},
+		&committeetypes.CommunityCDPWithdrawCollateralPermission{},
+	)
+	comm.SetPermissions(perms)
+	// save permission changes
+	committeeKeeper.SetCommittee(ctx, comm)
+}
 
-		// run migrations
-		vm, err := app.mm.RunMigrations(ctx, app.configurator, fromVM)
-		if err != nil {
-			panic(err)
+// RemoveEVMCommitteePermissions removes the following permissions to the committee with the passed in id:
+// - AllowedParamsChange for x/evm subspace (no longer stored in params)
+func RemoveEVMCommitteePermissions(ctx sdk.Context, committeeKeeper committeekeeper.Keeper, committeeId uint64) {
+	// get committee
+	comm, found := committeeKeeper.GetCommittee(ctx, committeeId)
+	if !found {
+		panic(fmt.Sprintf("expected to find committee with id %d but found none", committeeId))
+	}
+	perms := comm.GetPermissions()
+
+	// Remove the x/evm param permissions
+	for i, permission := range perms {
+		// Must be a pointer
+		paramPerm, ok := permission.(*committeetypes.ParamsChangePermission)
+		if !ok {
+			continue
 		}
 
-		// initialize x/mint params. must be done after migrations so module exists.
-		app.Logger().Info("initializing x/mint state")
-		InitializeMintState(ctx, app.mintKeeper, app.stakingKeeper)
+		var newAllowedParamsChanges committeetypes.AllowedParamsChanges
+		for _, param := range paramPerm.AllowedParamsChanges {
+			// Exclude the x/evm allowed param
+			if param.Subspace == evmtypes.ModuleName {
+				continue
+			}
 
-		return vm, nil
+			newAllowedParamsChanges = append(newAllowedParamsChanges, param)
+		}
+
+		// Update the allowed params
+		paramPerm.AllowedParamsChanges = newAllowedParamsChanges
+
+		// Update the permission
+		perms[i] = paramPerm
+	}
+
+	comm.SetPermissions(perms)
+	// save permission changes
+	committeeKeeper.SetCommittee(ctx, comm)
+}
+
+func GetCommunityPoolAllowedMsgs() []string {
+	return []string{
+		"/cosmos.bank.v1beta1.MsgSend",
+		"/cosmos.bank.v1beta1.MsgMultiSend",
+		"/cosmos.staking.v1beta1.MsgDelegate",
+		"/cosmos.staking.v1beta1.MsgBeginRedelegate",
+		"/cosmos.staking.v1beta1.MsgUndelegate",
+		"/cosmos.staking.v1beta1.MsgCancelUnbondingDelegation",
+		"/cosmos.distribution.v1beta1.MsgSetWithdrawAddress",
+		"/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward",
+		"/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission",
+		"/cosmos.distribution.v1beta1.MsgFundCommunityPool",
+		"/kava.cdp.v1beta1.MsgCreateCDP",
+		"/kava.cdp.v1beta1.MsgDeposit",
+		"/kava.cdp.v1beta1.MsgWithdraw",
+		"/kava.cdp.v1beta1.MsgDrawDebt",
+		"/kava.cdp.v1beta1.MsgRepayDebt",
+		"/kava.hard.v1beta1.MsgDeposit",
+		"/kava.hard.v1beta1.MsgWithdraw",
+		"/kava.hard.v1beta1.MsgBorrow",
+		"/kava.hard.v1beta1.MsgRepay",
+		"/kava.swap.v1beta1.MsgDeposit",
+		"/kava.swap.v1beta1.MsgWithdraw",
+		"/kava.swap.v1beta1.MsgSwapExactForTokens",
+		"/kava.swap.v1beta1.MsgSwapForExactTokens",
+		"/kava.liquid.v1beta1.MsgMintDerivative",
+		"/kava.liquid.v1beta1.MsgBurnDerivative",
 	}
 }
 
-// MigrateCommunityPoolFunds takes the full balance of the x/community module account and transfers them
-// back to the original community pool (the auth fee pool)
-// In the v0.20.0-alpha.0 upgrade handler, community pool funds were moved to the x/community module
-// account. This handler transfers them back.
-func MigrateCommunityPoolFunds(
-	ctx sdk.Context,
-	accountKeeper authkeeper.AccountKeeper,
-	communityKeeper communitykeeper.Keeper,
-	distKeeper distrkeeper.Keeper,
-) {
-	// get total balance of x/community module account
-	balance := communityKeeper.GetModuleAccountBalance(ctx)
-
-	// transfer whole balance to the community pool (auth fee pool held by x/distribution)
-	communityMaccAddress := accountKeeper.GetModuleAddress(communitytypes.ModuleAccountName)
-	err := distKeeper.FundCommunityPool(ctx, balance, communityMaccAddress)
-	if err != nil {
-		panic(fmt.Sprintf("failed to move community pool funds: %s", err))
+// EnableCommunityPoolIncentiveTracking fixes an issue in v0.21.0 where the community account was not tracked by incentive.
+// It only updates tracking for deposits and assumes there have been no borrows.
+func EnableCommunityPoolIncentiveTracking(ctx sdk.Context, hardkeeper hardkeeper.Keeper, incentiveKeeper incentivekeeper.Keeper) {
+	communityAddr := authtypes.NewModuleAddress(communitytypes.ModuleName)
+	deposit, found := hardkeeper.GetDeposit(ctx, communityAddr)
+	if !found {
+		return
 	}
-}
 
-// ReenableCommunityTax sets x/distribution's community_tax to the value currently on mainnet.
-func ReenableCommunityTax(ctx sdk.Context, distrKeeper distrkeeper.Keeper) {
-	params := distrKeeper.GetParams(ctx)
-	params.CommunityTax = sdk.MustNewDecFromStr("0.925000000000000000") // community tax currently present on mainnet
-	distrKeeper.SetParams(ctx, params)
-}
-
-// InitializeMintState sets up the parameters and state of x/mint.
-func InitializeMintState(
-	ctx sdk.Context,
-	mintKeeper mintkeeper.Keeper,
-	stakingKeeper stakingkeeper.Keeper,
-) {
-	// init params for x/mint with values from mainnet
-	inflationRate := sdk.MustNewDecFromStr("0.750000000000000000")
-	params := minttypes.DefaultParams()
-	params.MintDenom = stakingKeeper.BondDenom(ctx)
-	params.InflationMax = inflationRate
-	params.InflationMin = inflationRate
-
-	mintKeeper.SetParams(ctx, params)
+	_, found = incentiveKeeper.GetHardLiquidityProviderClaim(ctx, communityAddr)
+	if found {
+		return // skip if claim already exists
+	}
+	incentiveKeeper.InitializeHardSupplyReward(ctx, deposit)
 }

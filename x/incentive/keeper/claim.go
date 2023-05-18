@@ -1,8 +1,8 @@
 package keeper
 
 import (
+	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/kava-labs/kava/x/incentive/types"
 )
@@ -12,18 +12,18 @@ import (
 func (k Keeper) ClaimUSDXMintingReward(ctx sdk.Context, owner, receiver sdk.AccAddress, multiplierName string) error {
 	claim, found := k.GetUSDXMintingClaim(ctx, owner)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
+		return errorsmod.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
 	}
 
 	multiplier, found := k.GetMultiplierByDenom(ctx, types.USDXMintingRewardDenom, multiplierName)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", types.USDXMintingRewardDenom, multiplierName)
+		return errorsmod.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", types.USDXMintingRewardDenom, multiplierName)
 	}
 
 	claimEnd := k.GetClaimEnd(ctx)
 
 	if ctx.BlockTime().After(claimEnd) {
-		return sdkerrors.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
+		return errorsmod.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
 	}
 
 	claim, err := k.SynchronizeUSDXMintingClaim(ctx, claim)
@@ -31,7 +31,7 @@ func (k Keeper) ClaimUSDXMintingReward(ctx sdk.Context, owner, receiver sdk.AccA
 		return err
 	}
 
-	rewardAmount := claim.Reward.Amount.ToDec().Mul(multiplier.Factor).RoundInt()
+	rewardAmount := sdk.NewDecFromInt(claim.Reward.Amount).Mul(multiplier.Factor).RoundInt()
 	if rewardAmount.IsZero() {
 		return types.ErrZeroClaim
 	}
@@ -61,26 +61,26 @@ func (k Keeper) ClaimUSDXMintingReward(ctx sdk.Context, owner, receiver sdk.AccA
 func (k Keeper) ClaimHardReward(ctx sdk.Context, owner, receiver sdk.AccAddress, denom string, multiplierName string) error {
 	multiplier, found := k.GetMultiplierByDenom(ctx, denom, multiplierName)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", denom, multiplierName)
+		return errorsmod.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", denom, multiplierName)
 	}
 
 	claimEnd := k.GetClaimEnd(ctx)
 
 	if ctx.BlockTime().After(claimEnd) {
-		return sdkerrors.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
+		return errorsmod.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
 	}
 
 	k.SynchronizeHardLiquidityProviderClaim(ctx, owner)
 
 	syncedClaim, found := k.GetHardLiquidityProviderClaim(ctx, owner)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
+		return errorsmod.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
 	}
 
 	amt := syncedClaim.Reward.AmountOf(denom)
 
 	claimingCoins := sdk.NewCoins(sdk.NewCoin(denom, amt))
-	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, amt.ToDec().Mul(multiplier.Factor).RoundInt()))
+	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewDecFromInt(amt).Mul(multiplier.Factor).RoundInt()))
 	if rewardCoins.IsZero() {
 		return types.ErrZeroClaim
 	}
@@ -92,7 +92,7 @@ func (k Keeper) ClaimHardReward(ctx sdk.Context, owner, receiver sdk.AccAddress,
 	}
 
 	// remove claimed coins (NOT reward coins)
-	syncedClaim.Reward = syncedClaim.Reward.Sub(claimingCoins)
+	syncedClaim.Reward = syncedClaim.Reward.Sub(claimingCoins...)
 	k.SetHardLiquidityProviderClaim(ctx, syncedClaim)
 
 	ctx.EventManager().EmitEvent(
@@ -111,29 +111,29 @@ func (k Keeper) ClaimHardReward(ctx sdk.Context, owner, receiver sdk.AccAddress,
 func (k Keeper) ClaimDelegatorReward(ctx sdk.Context, owner, receiver sdk.AccAddress, denom string, multiplierName string) error {
 	claim, found := k.GetDelegatorClaim(ctx, owner)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
+		return errorsmod.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
 	}
 
 	multiplier, found := k.GetMultiplierByDenom(ctx, denom, multiplierName)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", denom, multiplierName)
+		return errorsmod.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", denom, multiplierName)
 	}
 
 	claimEnd := k.GetClaimEnd(ctx)
 
 	if ctx.BlockTime().After(claimEnd) {
-		return sdkerrors.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
+		return errorsmod.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
 	}
 
 	syncedClaim, err := k.SynchronizeDelegatorClaim(ctx, claim)
 	if err != nil {
-		return sdkerrors.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
+		return errorsmod.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
 	}
 
 	amt := syncedClaim.Reward.AmountOf(denom)
 
 	claimingCoins := sdk.NewCoins(sdk.NewCoin(denom, amt))
-	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, amt.ToDec().Mul(multiplier.Factor).RoundInt()))
+	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewDecFromInt(amt).Mul(multiplier.Factor).RoundInt()))
 	if rewardCoins.IsZero() {
 		return types.ErrZeroClaim
 	}
@@ -146,7 +146,7 @@ func (k Keeper) ClaimDelegatorReward(ctx sdk.Context, owner, receiver sdk.AccAdd
 	}
 
 	// remove claimed coins (NOT reward coins)
-	syncedClaim.Reward = syncedClaim.Reward.Sub(claimingCoins)
+	syncedClaim.Reward = syncedClaim.Reward.Sub(claimingCoins...)
 	k.SetDelegatorClaim(ctx, syncedClaim)
 
 	ctx.EventManager().EmitEvent(
@@ -165,24 +165,24 @@ func (k Keeper) ClaimDelegatorReward(ctx sdk.Context, owner, receiver sdk.AccAdd
 func (k Keeper) ClaimSwapReward(ctx sdk.Context, owner, receiver sdk.AccAddress, denom string, multiplierName string) error {
 	multiplier, found := k.GetMultiplierByDenom(ctx, denom, multiplierName)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", denom, multiplierName)
+		return errorsmod.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", denom, multiplierName)
 	}
 
 	claimEnd := k.GetClaimEnd(ctx)
 
 	if ctx.BlockTime().After(claimEnd) {
-		return sdkerrors.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
+		return errorsmod.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
 	}
 
 	syncedClaim, found := k.GetSynchronizedSwapClaim(ctx, owner)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
+		return errorsmod.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
 	}
 
 	amt := syncedClaim.Reward.AmountOf(denom)
 
 	claimingCoins := sdk.NewCoins(sdk.NewCoin(denom, amt))
-	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, amt.ToDec().Mul(multiplier.Factor).RoundInt()))
+	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewDecFromInt(amt).Mul(multiplier.Factor).RoundInt()))
 	if rewardCoins.IsZero() {
 		return types.ErrZeroClaim
 	}
@@ -194,7 +194,7 @@ func (k Keeper) ClaimSwapReward(ctx sdk.Context, owner, receiver sdk.AccAddress,
 	}
 
 	// remove claimed coins (NOT reward coins)
-	syncedClaim.Reward = syncedClaim.Reward.Sub(claimingCoins)
+	syncedClaim.Reward = syncedClaim.Reward.Sub(claimingCoins...)
 	k.SetSwapClaim(ctx, syncedClaim)
 
 	ctx.EventManager().EmitEvent(
@@ -212,26 +212,26 @@ func (k Keeper) ClaimSwapReward(ctx sdk.Context, owner, receiver sdk.AccAddress,
 func (k Keeper) ClaimSavingsReward(ctx sdk.Context, owner, receiver sdk.AccAddress, denom string, multiplierName string) error {
 	multiplier, found := k.GetMultiplierByDenom(ctx, denom, multiplierName)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", denom, multiplierName)
+		return errorsmod.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", denom, multiplierName)
 	}
 
 	claimEnd := k.GetClaimEnd(ctx)
 
 	if ctx.BlockTime().After(claimEnd) {
-		return sdkerrors.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
+		return errorsmod.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
 	}
 
 	k.SynchronizeSavingsClaim(ctx, owner)
 
 	syncedClaim, found := k.GetSavingsClaim(ctx, owner)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
+		return errorsmod.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
 	}
 
 	amt := syncedClaim.Reward.AmountOf(denom)
 
 	claimingCoins := sdk.NewCoins(sdk.NewCoin(denom, amt))
-	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, amt.ToDec().Mul(multiplier.Factor).RoundInt()))
+	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewDecFromInt(amt).Mul(multiplier.Factor).RoundInt()))
 	if rewardCoins.IsZero() {
 		return types.ErrZeroClaim
 	}
@@ -243,7 +243,7 @@ func (k Keeper) ClaimSavingsReward(ctx sdk.Context, owner, receiver sdk.AccAddre
 	}
 
 	// remove claimed coins (NOT reward coins)
-	syncedClaim.Reward = syncedClaim.Reward.Sub(claimingCoins)
+	syncedClaim.Reward = syncedClaim.Reward.Sub(claimingCoins...)
 	k.SetSavingsClaim(ctx, syncedClaim)
 
 	ctx.EventManager().EmitEvent(
@@ -262,24 +262,24 @@ func (k Keeper) ClaimSavingsReward(ctx sdk.Context, owner, receiver sdk.AccAddre
 func (k Keeper) ClaimEarnReward(ctx sdk.Context, owner, receiver sdk.AccAddress, denom string, multiplierName string) error {
 	multiplier, found := k.GetMultiplierByDenom(ctx, denom, multiplierName)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", denom, multiplierName)
+		return errorsmod.Wrapf(types.ErrInvalidMultiplier, "denom '%s' has no multiplier '%s'", denom, multiplierName)
 	}
 
 	claimEnd := k.GetClaimEnd(ctx)
 
 	if ctx.BlockTime().After(claimEnd) {
-		return sdkerrors.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
+		return errorsmod.Wrapf(types.ErrClaimExpired, "block time %s > claim end time %s", ctx.BlockTime(), claimEnd)
 	}
 
 	syncedClaim, found := k.GetSynchronizedEarnClaim(ctx, owner)
 	if !found {
-		return sdkerrors.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
+		return errorsmod.Wrapf(types.ErrClaimNotFound, "address: %s", owner)
 	}
 
 	amt := syncedClaim.Reward.AmountOf(denom)
 
 	claimingCoins := sdk.NewCoins(sdk.NewCoin(denom, amt))
-	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, amt.ToDec().Mul(multiplier.Factor).RoundInt()))
+	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, sdk.NewDecFromInt(amt).Mul(multiplier.Factor).RoundInt()))
 	if rewardCoins.IsZero() {
 		return types.ErrZeroClaim
 	}
@@ -291,7 +291,7 @@ func (k Keeper) ClaimEarnReward(ctx sdk.Context, owner, receiver sdk.AccAddress,
 	}
 
 	// remove claimed coins (NOT reward coins)
-	syncedClaim.Reward = syncedClaim.Reward.Sub(claimingCoins)
+	syncedClaim.Reward = syncedClaim.Reward.Sub(claimingCoins...)
 	k.SetEarnClaim(ctx, syncedClaim)
 
 	ctx.EventManager().EmitEvent(

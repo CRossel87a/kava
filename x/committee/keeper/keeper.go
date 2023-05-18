@@ -3,28 +3,29 @@ package keeper
 import (
 	"time"
 
+	errorsmod "cosmossdk.io/errors"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store/prefix"
+	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	govv1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 
 	"github.com/kava-labs/kava/x/committee/types"
 )
 
 type Keeper struct {
 	cdc      codec.Codec
-	storeKey sdk.StoreKey
+	storeKey storetypes.StoreKey
 
 	paramKeeper   types.ParamKeeper
 	accountKeeper types.AccountKeeper
 	bankKeeper    types.BankKeeper
 
 	// Proposal router
-	router govtypes.Router
+	router govv1beta1.Router
 }
 
-func NewKeeper(cdc codec.Codec, storeKey sdk.StoreKey, router govtypes.Router,
+func NewKeeper(cdc codec.Codec, storeKey storetypes.StoreKey, router govv1beta1.Router,
 	paramKeeper types.ParamKeeper, ak types.AccountKeeper, sk types.BankKeeper,
 ) Keeper {
 	// Logic in the keeper methods assume the set of gov handlers is fixed.
@@ -118,7 +119,7 @@ func (k Keeper) GetNextProposalID(ctx sdk.Context) (uint64, error) {
 	store := ctx.KVStore(k.storeKey)
 	bz := store.Get(types.NextProposalIDKey)
 	if bz == nil {
-		return 0, sdkerrors.Wrap(types.ErrInvalidGenesis, "next proposal ID not set at genesis")
+		return 0, errorsmod.Wrap(types.ErrInvalidGenesis, "next proposal ID not set at genesis")
 	}
 	return types.Uint64FromBytes(bz), nil
 }

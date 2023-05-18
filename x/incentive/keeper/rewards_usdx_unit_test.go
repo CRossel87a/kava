@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"testing"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/suite"
 
@@ -266,18 +267,18 @@ func (builder CDPBuilder) WithSourceShares(shares int64) CDPBuilder {
 		panic("setting source shares on cdp with existing interest factor not implemented")
 	}
 	// pick arbitrary interest factor
-	factor := sdk.NewInt(2)
+	factor := sdkmath.NewInt(2)
 
 	// Calculate deposit amount that would equal the requested source shares given the above factor.
-	principal := sdk.NewInt(shares).Mul(factor)
+	principal := sdkmath.NewInt(shares).Mul(factor)
 
 	builder.Principal = sdk.NewCoin(cdptypes.DefaultStableDenom, principal)
-	builder.InterestFactor = factor.ToDec()
+	builder.InterestFactor = sdk.NewDecFromInt(factor)
 
 	return builder
 }
 
-func (builder CDPBuilder) WithPrincipal(principal sdk.Int) CDPBuilder {
+func (builder CDPBuilder) WithPrincipal(principal sdkmath.Int) CDPBuilder {
 	builder.Principal = sdk.NewCoin(cdptypes.DefaultStableDenom, principal)
 	return builder
 }

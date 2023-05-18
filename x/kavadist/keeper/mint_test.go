@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/kava-labs/kava/app"
@@ -91,7 +92,6 @@ func (suite *keeperTestSuite) TestMintNotActive() {
 }
 
 func (suite *keeperTestSuite) TestInfraMinting() {
-
 	type args struct {
 		startTime           time.Time
 		endTime             time.Time
@@ -118,7 +118,7 @@ func (suite *keeperTestSuite) TestInfraMinting() {
 				startTime:           time.Date(2022, time.October, 1, 1, 0, 0, 0, time.UTC),
 				endTime:             time.Date(2023, time.October, 1, 1, 0, 0, 0, time.UTC),
 				infraPeriods:        types.Periods{types.NewPeriod(time.Date(2022, time.October, 1, 1, 0, 0, 0, time.UTC), time.Date(2023, time.October, 1, 1, 0, 0, 0, time.UTC), sdk.MustNewDecFromStr("1.000000001547125958"))},
-				expectedFinalSupply: sdk.NewCoin(types.GovDenom, sdk.NewInt(1050000000000)),
+				expectedFinalSupply: sdk.NewCoin(types.GovDenom, sdkmath.NewInt(1050000000000)),
 				marginOfError:       sdk.MustNewDecFromStr("0.0001"),
 			},
 			errArgs{
@@ -132,7 +132,7 @@ func (suite *keeperTestSuite) TestInfraMinting() {
 				startTime:           time.Date(2022, time.October, 1, 1, 0, 0, 0, time.UTC),
 				endTime:             time.Date(2022, time.October, 1, 1, 0, 10, 0, time.UTC),
 				infraPeriods:        types.Periods{types.NewPeriod(time.Date(2022, time.October, 1, 1, 0, 0, 0, time.UTC), time.Date(2023, time.October, 1, 1, 0, 0, 0, time.UTC), sdk.MustNewDecFromStr("1.000000001547125958"))},
-				expectedFinalSupply: sdk.NewCoin(types.GovDenom, sdk.NewInt(1000000015471)),
+				expectedFinalSupply: sdk.NewCoin(types.GovDenom, sdkmath.NewInt(1000000015471)),
 				marginOfError:       sdk.MustNewDecFromStr("0.0001"),
 			},
 			errArgs{
@@ -150,14 +150,29 @@ func (suite *keeperTestSuite) TestInfraMinting() {
 		suite.Require().NotPanics(func() {
 			suite.Keeper.SetPreviousBlockTime(ctx, tc.args.startTime)
 		})
+
+		// Delete initial genesis tokens to start with a clean slate
+		suite.App.DeleteGenesisValidator(suite.T(), suite.Ctx)
+		suite.App.DeleteGenesisValidatorCoins(suite.T(), suite.Ctx)
+
 		ctx = suite.Ctx.WithBlockTime(tc.args.endTime)
 		err := suite.Keeper.MintPeriodInflation(ctx)
 		suite.Require().NoError(err)
+
 		finalSupply := suite.BankKeeper.GetSupply(ctx, types.GovDenom)
-		marginHigh := tc.args.expectedFinalSupply.Amount.ToDec().Mul(sdk.OneDec().Add(tc.args.marginOfError))
-		marginLow := tc.args.expectedFinalSupply.Amount.ToDec().Mul(sdk.OneDec().Sub(tc.args.marginOfError))
-		suite.Require().True(finalSupply.Amount.ToDec().LTE(marginHigh))
-		suite.Require().True(finalSupply.Amount.ToDec().GTE(marginLow))
+		marginHigh := sdk.NewDecFromInt(tc.args.expectedFinalSupply.Amount).Mul(sdk.OneDec().Add(tc.args.marginOfError))
+		marginLow := sdk.NewDecFromInt(tc.args.expectedFinalSupply.Amount).Mul(sdk.OneDec().Sub(tc.args.marginOfError))
+		suite.Require().Truef(
+			sdk.NewDecFromInt(finalSupply.Amount).LTE(marginHigh),
+			"final supply %s is not <= %s high margin",
+			finalSupply.Amount.String(),
+			marginHigh.String(),
+		)
+		suite.Require().Truef(
+			sdk.NewDecFromInt(finalSupply.Amount).GTE(marginLow),
+			"final supply %s is not >= %s low margin",
+			finalSupply.Amount.String(),
+		)
 
 	}
 
@@ -192,8 +207,8 @@ func (suite *keeperTestSuite) TestInfraPayoutCore() {
 				startTime:               time.Date(2022, time.October, 1, 1, 0, 0, 0, time.UTC),
 				endTime:                 time.Date(2023, time.October, 1, 1, 0, 0, 0, time.UTC),
 				infraPeriods:            types.Periods{types.NewPeriod(time.Date(2022, time.October, 1, 1, 0, 0, 0, time.UTC), time.Date(2023, time.October, 1, 1, 0, 0, 0, time.UTC), sdk.MustNewDecFromStr("1.000000001547125958"))},
-				expectedFinalSupply:     sdk.NewCoin(types.GovDenom, sdk.NewInt(1050000000000)),
-				expectedBalanceIncrease: sdk.NewCoin(types.GovDenom, sdk.NewInt(50000000000)),
+				expectedFinalSupply:     sdk.NewCoin(types.GovDenom, sdkmath.NewInt(1050000000000)),
+				expectedBalanceIncrease: sdk.NewCoin(types.GovDenom, sdkmath.NewInt(50000000000)),
 				marginOfError:           sdk.MustNewDecFromStr("0.0001"),
 			},
 			errArgs{
@@ -212,15 +227,20 @@ func (suite *keeperTestSuite) TestInfraPayoutCore() {
 		suite.Require().NotPanics(func() {
 			suite.Keeper.SetPreviousBlockTime(ctx, tc.args.startTime)
 		})
+
+		// Delete initial genesis tokens to start with a clean slate
+		suite.App.DeleteGenesisValidator(suite.T(), suite.Ctx)
+		suite.App.DeleteGenesisValidatorCoins(suite.T(), suite.Ctx)
+
 		initialBalance := suite.BankKeeper.GetBalance(ctx, suite.Addrs[0], types.GovDenom)
 		ctx = suite.Ctx.WithBlockTime(tc.args.endTime)
 		err := suite.Keeper.MintPeriodInflation(ctx)
 		suite.Require().NoError(err)
 		finalSupply := suite.BankKeeper.GetSupply(ctx, types.GovDenom)
-		marginHigh := tc.args.expectedFinalSupply.Amount.ToDec().Mul(sdk.OneDec().Add(tc.args.marginOfError))
-		marginLow := tc.args.expectedFinalSupply.Amount.ToDec().Mul(sdk.OneDec().Sub(tc.args.marginOfError))
-		suite.Require().True(finalSupply.Amount.ToDec().LTE(marginHigh))
-		suite.Require().True(finalSupply.Amount.ToDec().GTE(marginLow))
+		marginHigh := sdk.NewDecFromInt(tc.args.expectedFinalSupply.Amount).Mul(sdk.OneDec().Add(tc.args.marginOfError))
+		marginLow := sdk.NewDecFromInt(tc.args.expectedFinalSupply.Amount).Mul(sdk.OneDec().Sub(tc.args.marginOfError))
+		suite.Require().True(sdk.NewDecFromInt(finalSupply.Amount).LTE(marginHigh))
+		suite.Require().True(sdk.NewDecFromInt(finalSupply.Amount).GTE(marginLow))
 
 		finalBalance := suite.BankKeeper.GetBalance(ctx, suite.Addrs[0], types.GovDenom)
 		suite.Require().Equal(tc.args.expectedBalanceIncrease, finalBalance.Sub(initialBalance))
@@ -258,8 +278,8 @@ func (suite *keeperTestSuite) TestInfraPayoutPartner() {
 				startTime:               time.Date(2022, time.October, 1, 1, 0, 0, 0, time.UTC),
 				endTime:                 time.Date(2023, time.October, 1, 1, 0, 0, 0, time.UTC),
 				infraPeriods:            types.Periods{types.NewPeriod(time.Date(2022, time.October, 1, 1, 0, 0, 0, time.UTC), time.Date(2023, time.October, 1, 1, 0, 0, 0, time.UTC), sdk.MustNewDecFromStr("1.000000001547125958"))},
-				expectedFinalSupply:     sdk.NewCoin(types.GovDenom, sdk.NewInt(1050000000000)),
-				expectedBalanceIncrease: sdk.NewCoin(types.GovDenom, sdk.NewInt(63072000)),
+				expectedFinalSupply:     sdk.NewCoin(types.GovDenom, sdkmath.NewInt(1050000000000)),
+				expectedBalanceIncrease: sdk.NewCoin(types.GovDenom, sdkmath.NewInt(63072000)),
 				marginOfError:           sdk.MustNewDecFromStr("0.0001"),
 			},
 			errArgs{
@@ -271,22 +291,27 @@ func (suite *keeperTestSuite) TestInfraPayoutPartner() {
 
 	for _, tc := range testCases {
 		suite.SetupTest()
-		partnerReward := types.NewPartnerReward(suite.Addrs[0], sdk.NewCoin(types.GovDenom, sdk.NewInt(2)))
+		partnerReward := types.NewPartnerReward(suite.Addrs[0], sdk.NewCoin(types.GovDenom, sdkmath.NewInt(2)))
 		params := types.NewParams(true, types.DefaultPeriods, types.NewInfraParams(tc.args.infraPeriods, types.PartnerRewards{partnerReward}, types.DefaultInfraParams.CoreRewards))
 		ctx := suite.Ctx.WithBlockTime(tc.args.startTime)
 		suite.Keeper.SetParams(ctx, params)
 		suite.Require().NotPanics(func() {
 			suite.Keeper.SetPreviousBlockTime(ctx, tc.args.startTime)
 		})
+
+		// Delete initial genesis tokens to start with a clean slate
+		suite.App.DeleteGenesisValidator(suite.T(), suite.Ctx)
+		suite.App.DeleteGenesisValidatorCoins(suite.T(), suite.Ctx)
+
 		initialBalance := suite.BankKeeper.GetBalance(ctx, suite.Addrs[0], types.GovDenom)
 		ctx = suite.Ctx.WithBlockTime(tc.args.endTime)
 		err := suite.Keeper.MintPeriodInflation(ctx)
 		suite.Require().NoError(err)
 		finalSupply := suite.BankKeeper.GetSupply(ctx, types.GovDenom)
-		marginHigh := tc.args.expectedFinalSupply.Amount.ToDec().Mul(sdk.OneDec().Add(tc.args.marginOfError))
-		marginLow := tc.args.expectedFinalSupply.Amount.ToDec().Mul(sdk.OneDec().Sub(tc.args.marginOfError))
-		suite.Require().True(finalSupply.Amount.ToDec().LTE(marginHigh))
-		suite.Require().True(finalSupply.Amount.ToDec().GTE(marginLow))
+		marginHigh := sdk.NewDecFromInt(tc.args.expectedFinalSupply.Amount).Mul(sdk.OneDec().Add(tc.args.marginOfError))
+		marginLow := sdk.NewDecFromInt(tc.args.expectedFinalSupply.Amount).Mul(sdk.OneDec().Sub(tc.args.marginOfError))
+		suite.Require().True(sdk.NewDecFromInt(finalSupply.Amount).LTE(marginHigh))
+		suite.Require().True(sdk.NewDecFromInt(finalSupply.Amount).GTE(marginLow))
 
 		finalBalance := suite.BankKeeper.GetBalance(ctx, suite.Addrs[0], types.GovDenom)
 		suite.Require().Equal(tc.args.expectedBalanceIncrease, finalBalance.Sub(initialBalance))
@@ -338,11 +363,11 @@ func (suite *keeperTestSuite) TestInfraPayoutE2E() {
 				endTime:             time.Date(2023, time.October, 1, 1, 0, 0, 0, time.UTC),
 				infraPeriods:        types.Periods{types.NewPeriod(time.Date(2022, time.October, 1, 1, 0, 0, 0, time.UTC), time.Date(2023, time.October, 1, 1, 0, 0, 0, time.UTC), sdk.MustNewDecFromStr("1.000000001547125958"))},
 				coreRewards:         types.CoreRewards{types.NewCoreReward(addrs[1], sdk.OneDec())},
-				partnerRewards:      types.PartnerRewards{types.NewPartnerReward(addrs[2], sdk.NewCoin("ukava", sdk.NewInt(2)))},
-				expectedFinalSupply: sdk.NewCoin(types.GovDenom, sdk.NewInt(1102500000000)),
+				partnerRewards:      types.PartnerRewards{types.NewPartnerReward(addrs[2], sdk.NewCoin("ukava", sdkmath.NewInt(2)))},
+				expectedFinalSupply: sdk.NewCoin(types.GovDenom, sdkmath.NewInt(1102500000000)),
 				expectedBalances: balances{
-					balance{addrs[1], sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(52436928000)))},
-					balance{addrs[2], sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(63072000)))},
+					balance{addrs[1], sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(52436928000)))},
+					balance{addrs[2], sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(63072000)))},
 				},
 				marginOfError: sdk.MustNewDecFromStr("0.0001"),
 			},
@@ -361,14 +386,19 @@ func (suite *keeperTestSuite) TestInfraPayoutE2E() {
 		suite.Require().NotPanics(func() {
 			suite.Keeper.SetPreviousBlockTime(ctx, tc.args.startTime)
 		})
+
+		// Delete initial genesis tokens to start with a clean slate
+		suite.App.DeleteGenesisValidator(suite.T(), suite.Ctx)
+		suite.App.DeleteGenesisValidatorCoins(suite.T(), suite.Ctx)
+
 		ctx = suite.Ctx.WithBlockTime(tc.args.endTime)
 		err := suite.Keeper.MintPeriodInflation(ctx)
 		suite.Require().NoError(err)
 		finalSupply := suite.BankKeeper.GetSupply(ctx, types.GovDenom)
-		marginHigh := tc.args.expectedFinalSupply.Amount.ToDec().Mul(sdk.OneDec().Add(tc.args.marginOfError))
-		marginLow := tc.args.expectedFinalSupply.Amount.ToDec().Mul(sdk.OneDec().Sub(tc.args.marginOfError))
-		suite.Require().True(finalSupply.Amount.ToDec().LTE(marginHigh))
-		suite.Require().True(finalSupply.Amount.ToDec().GTE(marginLow))
+		marginHigh := sdk.NewDecFromInt(tc.args.expectedFinalSupply.Amount).Mul(sdk.OneDec().Add(tc.args.marginOfError))
+		marginLow := sdk.NewDecFromInt(tc.args.expectedFinalSupply.Amount).Mul(sdk.OneDec().Sub(tc.args.marginOfError))
+		suite.Require().True(sdk.NewDecFromInt(finalSupply.Amount).LTE(marginHigh))
+		suite.Require().True(sdk.NewDecFromInt(finalSupply.Amount).GTE(marginLow))
 
 		for _, bal := range tc.args.expectedBalances {
 			finalBalance := suite.BankKeeper.GetAllBalances(ctx, bal.address)

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
@@ -48,13 +49,13 @@ func (cdp CDP) Validate() error {
 		return errors.New("cdp owner cannot be empty")
 	}
 	if !cdp.Collateral.IsValid() {
-		return sdkerrors.Wrapf(sdkerrors.ErrInvalidCoins, "collateral %s", cdp.Collateral)
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidCoins, "collateral %s", cdp.Collateral)
 	}
 	if !cdp.Principal.IsValid() {
-		return sdkerrors.Wrapf(sdkerrors.ErrInvalidCoins, "principal %s", cdp.Principal)
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidCoins, "principal %s", cdp.Principal)
 	}
 	if !cdp.AccumulatedFees.IsValid() {
-		return sdkerrors.Wrapf(sdkerrors.ErrInvalidCoins, "accumulated fees %s", cdp.AccumulatedFees)
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidCoins, "accumulated fees %s", cdp.AccumulatedFees)
 	}
 	if cdp.FeesUpdated.Unix() <= 0 {
 		return errors.New("cdp updated fee time cannot be zero")
@@ -81,7 +82,7 @@ func (cdp CDP) GetNormalizedPrincipal() (sdk.Dec, error) {
 	if cdp.InterestFactor.LT(sdk.OneDec()) {
 		return sdk.Dec{}, fmt.Errorf("interest factor '%s' must be ≥ 1", cdp.InterestFactor)
 	}
-	return unsyncedDebt.ToDec().Quo(cdp.InterestFactor), nil
+	return sdk.NewDecFromInt(unsyncedDebt).Quo(cdp.InterestFactor), nil
 }
 
 // CDPs a collection of CDP objects

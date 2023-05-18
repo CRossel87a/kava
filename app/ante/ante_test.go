@@ -1,10 +1,12 @@
 package ante_test
 
 import (
+	"math/rand"
 	"os"
 	"testing"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/codec"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/simapp/helpers"
@@ -13,11 +15,11 @@ import (
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	authz "github.com/cosmos/cosmos-sdk/x/authz"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	evmtypes "github.com/evmos/ethermint/x/evm/types"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/log"
 	tmdb "github.com/tendermint/tm-db"
-	evmtypes "github.com/tharsis/ethermint/x/evm/types"
 
 	"github.com/kava-labs/kava/app"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
@@ -104,7 +106,8 @@ func TestAppAnteHandler_AuthorizedMempool(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			stdTx, err := helpers.GenTx(
+			stdTx, err := helpers.GenSignedMockTx(
+				rand.New(rand.NewSource(time.Now().UnixNano())),
 				encodingConfig.TxConfig,
 				[]sdk.Msg{
 					banktypes.NewMsgSend(
@@ -159,16 +162,16 @@ func newBep3GenStateMulti(cdc codec.JSONCodec, deputyAddress sdk.AccAddress) app
 					Denom:  "bnb",
 					CoinID: 714,
 					SupplyLimit: bep3types.SupplyLimit{
-						Limit:          sdk.NewInt(350000000000000),
+						Limit:          sdkmath.NewInt(350000000000000),
 						TimeLimited:    false,
 						TimeBasedLimit: sdk.ZeroInt(),
 						TimePeriod:     time.Hour,
 					},
 					Active:        true,
 					DeputyAddress: deputyAddress,
-					FixedFee:      sdk.NewInt(1000),
+					FixedFee:      sdkmath.NewInt(1000),
 					MinSwapAmount: sdk.OneInt(),
-					MaxSwapAmount: sdk.NewInt(1000000000000),
+					MaxSwapAmount: sdkmath.NewInt(1000000000000),
 					MinBlockLock:  bep3types.DefaultMinBlockLock,
 					MaxBlockLock:  bep3types.DefaultMaxBlockLock,
 				},
@@ -192,11 +195,13 @@ func TestAppAnteHandler_RejectMsgsInAuthz(t *testing.T) {
 	testPrivKeys, testAddresses := app.GeneratePrivKeyAddressPairs(10)
 
 	newMsgGrant := func(msgTypeUrl string) *authz.MsgGrant {
+		t := time.Date(9000, 1, 1, 0, 0, 0, 0, time.UTC)
+
 		msg, err := authz.NewMsgGrant(
 			testAddresses[0],
 			testAddresses[1],
 			authz.NewGenericAuthorization(msgTypeUrl),
-			time.Date(9000, 1, 1, 0, 0, 0, 0, time.UTC),
+			&t,
 		)
 		if err != nil {
 			panic(err)
@@ -233,7 +238,8 @@ func TestAppAnteHandler_RejectMsgsInAuthz(t *testing.T) {
 				chainID,
 			)
 
-			stdTx, err := helpers.GenTx(
+			stdTx, err := helpers.GenSignedMockTx(
+				rand.New(rand.NewSource(time.Now().UnixNano())),
 				encodingConfig.TxConfig,
 				[]sdk.Msg{tc.msg},
 				sdk.NewCoins(), // no fee

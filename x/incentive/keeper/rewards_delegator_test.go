@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/staking"
@@ -142,6 +143,9 @@ func (suite *DelegatorRewardsTestSuite) TestAccumulateDelegatorRewards() {
 			err = suite.deliverMsgDelegate(suite.ctx, suite.addrs[0], suite.validatorAddrs[0], tc.args.delegation)
 			suite.Require().NoError(err)
 
+			// Delete genesis validator to not influence rewards
+			suite.app.DeleteGenesisValidator(suite.T(), suite.ctx)
+
 			staking.EndBlocker(suite.ctx, suite.stakingKeeper)
 
 			// Set up chain context at future time
@@ -240,6 +244,9 @@ func (suite *DelegatorRewardsTestSuite) TestSynchronizeDelegatorReward() {
 			err := suite.deliverMsgCreateValidator(suite.ctx, suite.validatorAddrs[0], selfDelegationCoins)
 			suite.Require().NoError(err)
 			staking.EndBlocker(suite.ctx, suite.stakingKeeper)
+
+			// Delete genesis validator to not influence rewards
+			suite.app.DeleteGenesisValidator(suite.T(), suite.ctx)
 
 			// Delegator delegates
 			err = suite.deliverMsgDelegate(suite.ctx, suite.addrs[0], suite.validatorAddrs[0], tc.args.delegation)
@@ -364,6 +371,9 @@ func (suite *DelegatorRewardsTestSuite) TestSimulateDelegatorRewardSynchronizati
 			err = suite.deliverMsgDelegate(suite.ctx, suite.addrs[0], suite.validatorAddrs[0], tc.args.delegation)
 			suite.Require().NoError(err)
 
+			// Delete genesis validator to not influence rewards
+			suite.app.DeleteGenesisValidator(suite.T(), suite.ctx)
+
 			staking.EndBlocker(suite.ctx, suite.stakingKeeper)
 
 			// Check that Staking hooks initialized a DelegatorClaim
@@ -416,14 +426,14 @@ func (suite *DelegatorRewardsTestSuite) deliverMsgCreateValidator(ctx sdk.Contex
 		selfDelegation,
 		stakingtypes.Description{},
 		stakingtypes.NewCommissionRates(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec()),
-		sdk.NewInt(1_000_000),
+		sdkmath.NewInt(1_000_000),
 	)
 	if err != nil {
 		return err
 	}
 
-	handleStakingMsg := staking.NewHandler(suite.stakingKeeper)
-	_, err = handleStakingMsg(ctx, msg)
+	msgServer := stakingkeeper.NewMsgServerImpl(suite.stakingKeeper)
+	_, err = msgServer.CreateValidator(sdk.WrapSDKContext(suite.ctx), msg)
 	return err
 }
 
@@ -434,8 +444,8 @@ func (suite *DelegatorRewardsTestSuite) deliverMsgDelegate(ctx sdk.Context, dele
 		amount,
 	)
 
-	handleStakingMsg := staking.NewHandler(suite.stakingKeeper)
-	_, err := handleStakingMsg(ctx, msg)
+	msgServer := stakingkeeper.NewMsgServerImpl(suite.stakingKeeper)
+	_, err := msgServer.Delegate(sdk.WrapSDKContext(suite.ctx), msg)
 	return err
 }
 
@@ -446,8 +456,9 @@ func (suite *DelegatorRewardsTestSuite) deliverMsgRedelegate(ctx sdk.Context, de
 		destinationValidator,
 		amount,
 	)
-	handleStakingMsg := staking.NewHandler(suite.stakingKeeper)
-	_, err := handleStakingMsg(ctx, msg)
+
+	msgServer := stakingkeeper.NewMsgServerImpl(suite.stakingKeeper)
+	_, err := msgServer.BeginRedelegate(sdk.WrapSDKContext(suite.ctx), msg)
 	return err
 }
 
@@ -748,6 +759,9 @@ func (suite *DelegatorRewardsTestSuite) TestRedelegationSyncsClaim() {
 	suite.Require().NoError(err)
 	err = suite.deliverMsgCreateValidator(suite.ctx, suite.validatorAddrs[1], c(bondDenom, 5_000_000))
 	suite.Require().NoError(err)
+
+	// Delete genesis validator to not influence rewards
+	suite.app.DeleteGenesisValidator(suite.T(), suite.ctx)
 
 	// Delegatefrom the test user. This will initialize their incentive claim.
 	err = suite.deliverMsgDelegate(suite.ctx, suite.addrs[0], suite.validatorAddrs[0], c(bondDenom, 1_000_000))

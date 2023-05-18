@@ -7,9 +7,10 @@ import (
 
 	"github.com/tendermint/tendermint/libs/log"
 
+	errorsmod "cosmossdk.io/errors"
 	"github.com/cosmos/cosmos-sdk/codec"
+	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
 	"github.com/kava-labs/kava/x/pricefeed/types"
@@ -18,7 +19,7 @@ import (
 // Keeper struct for pricefeed module
 type Keeper struct {
 	// key used to access the stores from Context
-	key sdk.StoreKey
+	key storetypes.StoreKey
 	// Codec for binary encoding/decoding
 	cdc codec.Codec
 	// The reference to the Paramstore to get and set pricefeed specific params
@@ -27,7 +28,7 @@ type Keeper struct {
 
 // NewKeeper returns a new keeper for the pricefeed module.
 func NewKeeper(
-	cdc codec.Codec, key sdk.StoreKey, paramstore paramtypes.Subspace,
+	cdc codec.Codec, key storetypes.StoreKey, paramstore paramtypes.Subspace,
 ) Keeper {
 	if !paramstore.HasKeyTable() {
 		paramstore = paramstore.WithKeyTable(types.ParamKeyTable())
@@ -82,7 +83,7 @@ func (k Keeper) SetPrice(
 func (k Keeper) SetCurrentPrices(ctx sdk.Context, marketID string) error {
 	_, ok := k.GetMarket(ctx, marketID)
 	if !ok {
-		return sdkerrors.Wrap(types.ErrInvalidMarket, marketID)
+		return errorsmod.Wrap(types.ErrInvalidMarket, marketID)
 	}
 	// store current price
 	validPrevPrice := true

@@ -138,6 +138,9 @@
   
 - [kava/committee/v1beta1/permissions.proto](#kava/committee/v1beta1/permissions.proto)
     - [AllowedParamsChange](#kava.committee.v1beta1.AllowedParamsChange)
+    - [CommunityCDPRepayDebtPermission](#kava.committee.v1beta1.CommunityCDPRepayDebtPermission)
+    - [CommunityCDPWithdrawCollateralPermission](#kava.committee.v1beta1.CommunityCDPWithdrawCollateralPermission)
+    - [CommunityPoolLendWithdrawPermission](#kava.committee.v1beta1.CommunityPoolLendWithdrawPermission)
     - [GodPermission](#kava.committee.v1beta1.GodPermission)
     - [ParamsChangePermission](#kava.committee.v1beta1.ParamsChangePermission)
     - [SoftwareUpgradePermission](#kava.committee.v1beta1.SoftwareUpgradePermission)
@@ -179,12 +182,16 @@
     - [Msg](#kava.committee.v1beta1.Msg)
   
 - [kava/community/v1beta1/proposal.proto](#kava/community/v1beta1/proposal.proto)
+    - [CommunityCDPRepayDebtProposal](#kava.community.v1beta1.CommunityCDPRepayDebtProposal)
+    - [CommunityCDPWithdrawCollateralProposal](#kava.community.v1beta1.CommunityCDPWithdrawCollateralProposal)
     - [CommunityPoolLendDepositProposal](#kava.community.v1beta1.CommunityPoolLendDepositProposal)
     - [CommunityPoolLendWithdrawProposal](#kava.community.v1beta1.CommunityPoolLendWithdrawProposal)
   
 - [kava/community/v1beta1/query.proto](#kava/community/v1beta1/query.proto)
     - [QueryBalanceRequest](#kava.community.v1beta1.QueryBalanceRequest)
     - [QueryBalanceResponse](#kava.community.v1beta1.QueryBalanceResponse)
+    - [QueryTotalBalanceRequest](#kava.community.v1beta1.QueryTotalBalanceRequest)
+    - [QueryTotalBalanceResponse](#kava.community.v1beta1.QueryTotalBalanceResponse)
   
     - [Query](#kava.community.v1beta1.Query)
   
@@ -2321,6 +2328,36 @@ AllowedParamsChange contains data on the allowed parameter changes for subspace,
 
 
 
+<a name="kava.committee.v1beta1.CommunityCDPRepayDebtPermission"></a>
+
+### CommunityCDPRepayDebtPermission
+CommunityCDPRepayDebtPermission allows submission of CommunityCDPRepayDebtProposal
+
+
+
+
+
+
+<a name="kava.committee.v1beta1.CommunityCDPWithdrawCollateralPermission"></a>
+
+### CommunityCDPWithdrawCollateralPermission
+CommunityCDPWithdrawCollateralPermission allows submission of CommunityCDPWithdrawCollateralProposal
+
+
+
+
+
+
+<a name="kava.committee.v1beta1.CommunityPoolLendWithdrawPermission"></a>
+
+### CommunityPoolLendWithdrawPermission
+CommunityPoolLendWithdrawPermission allows submission of CommunityPoolLendWithdrawProposal
+
+
+
+
+
+
 <a name="kava.committee.v1beta1.GodPermission"></a>
 
 ### GodPermission
@@ -2844,6 +2881,44 @@ Msg defines the committee Msg service
 
 
 
+<a name="kava.community.v1beta1.CommunityCDPRepayDebtProposal"></a>
+
+### CommunityCDPRepayDebtProposal
+CommunityCDPRepayDebtProposal repays a cdp debt position owned by the community module
+This proposal exists primarily to allow committees to repay community module cdp debts.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `title` | [string](#string) |  |  |
+| `description` | [string](#string) |  |  |
+| `collateral_type` | [string](#string) |  |  |
+| `payment` | [cosmos.base.v1beta1.Coin](#cosmos.base.v1beta1.Coin) |  |  |
+
+
+
+
+
+
+<a name="kava.community.v1beta1.CommunityCDPWithdrawCollateralProposal"></a>
+
+### CommunityCDPWithdrawCollateralProposal
+CommunityCDPWithdrawCollateralProposal withdraws cdp collateral owned by the community module
+This proposal exists primarily to allow committees to withdraw community module cdp collateral.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `title` | [string](#string) |  |  |
+| `description` | [string](#string) |  |  |
+| `collateral_type` | [string](#string) |  |  |
+| `collateral` | [cosmos.base.v1beta1.Coin](#cosmos.base.v1beta1.Coin) |  |  |
+
+
+
+
+
+
 <a name="kava.community.v1beta1.CommunityPoolLendDepositProposal"></a>
 
 ### CommunityPoolLendDepositProposal
@@ -2918,6 +2993,32 @@ QueryBalanceResponse defines the response type for querying x/community balance.
 
 
 
+
+<a name="kava.community.v1beta1.QueryTotalBalanceRequest"></a>
+
+### QueryTotalBalanceRequest
+QueryTotalBalanceRequest defines the request type for querying total community pool balance.
+
+
+
+
+
+
+<a name="kava.community.v1beta1.QueryTotalBalanceResponse"></a>
+
+### QueryTotalBalanceResponse
+QueryTotalBalanceResponse defines the response type for querying total
+community pool balance. This matches the x/distribution CommunityPool query response.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `pool` | [cosmos.base.v1beta1.DecCoin](#cosmos.base.v1beta1.DecCoin) | repeated | pool defines community pool's coins. |
+
+
+
+
+
  <!-- end messages -->
 
  <!-- end enums -->
@@ -2933,6 +3034,7 @@ Query defines the gRPC querier service for x/community.
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
 | `Balance` | [QueryBalanceRequest](#kava.community.v1beta1.QueryBalanceRequest) | [QueryBalanceResponse](#kava.community.v1beta1.QueryBalanceResponse) | Balance queries the balance of all coins of x/community module. | GET|/kava/community/v1beta1/balance|
+| `TotalBalance` | [QueryTotalBalanceRequest](#kava.community.v1beta1.QueryTotalBalanceRequest) | [QueryTotalBalanceResponse](#kava.community.v1beta1.QueryTotalBalanceResponse) | TotalBalance queries the balance of all coins, including x/distribution, x/community, and supplied balances. | GET|/kava/community/v1beta1/total_balance|
 
  <!-- end services -->
 
@@ -4459,13 +4561,13 @@ Query defines the gRPC querier service for bep3 module.
 | `Accounts` | [QueryAccountsRequest](#kava.hard.v1beta1.QueryAccountsRequest) | [QueryAccountsResponse](#kava.hard.v1beta1.QueryAccountsResponse) | Accounts queries module accounts. | GET|/kava/hard/v1beta1/accounts|
 | `Deposits` | [QueryDepositsRequest](#kava.hard.v1beta1.QueryDepositsRequest) | [QueryDepositsResponse](#kava.hard.v1beta1.QueryDepositsResponse) | Deposits queries hard deposits. | GET|/kava/hard/v1beta1/deposits|
 | `UnsyncedDeposits` | [QueryUnsyncedDepositsRequest](#kava.hard.v1beta1.QueryUnsyncedDepositsRequest) | [QueryUnsyncedDepositsResponse](#kava.hard.v1beta1.QueryUnsyncedDepositsResponse) | UnsyncedDeposits queries unsynced deposits. | GET|/kava/hard/v1beta1/unsynced-deposits|
-| `TotalDeposited` | [QueryTotalDepositedRequest](#kava.hard.v1beta1.QueryTotalDepositedRequest) | [QueryTotalDepositedResponse](#kava.hard.v1beta1.QueryTotalDepositedResponse) | TotalDeposited queries total coins deposited to hard liquidity pools. | GET|/kava/hard/v1beta1/total-deposited/{denom}|
+| `TotalDeposited` | [QueryTotalDepositedRequest](#kava.hard.v1beta1.QueryTotalDepositedRequest) | [QueryTotalDepositedResponse](#kava.hard.v1beta1.QueryTotalDepositedResponse) | TotalDeposited queries total coins deposited to hard liquidity pools. | GET|/kava/hard/v1beta1/total-deposited|
 | `Borrows` | [QueryBorrowsRequest](#kava.hard.v1beta1.QueryBorrowsRequest) | [QueryBorrowsResponse](#kava.hard.v1beta1.QueryBorrowsResponse) | Borrows queries hard borrows. | GET|/kava/hard/v1beta1/borrows|
 | `UnsyncedBorrows` | [QueryUnsyncedBorrowsRequest](#kava.hard.v1beta1.QueryUnsyncedBorrowsRequest) | [QueryUnsyncedBorrowsResponse](#kava.hard.v1beta1.QueryUnsyncedBorrowsResponse) | UnsyncedBorrows queries unsynced borrows. | GET|/kava/hard/v1beta1/unsynced-borrows|
-| `TotalBorrowed` | [QueryTotalBorrowedRequest](#kava.hard.v1beta1.QueryTotalBorrowedRequest) | [QueryTotalBorrowedResponse](#kava.hard.v1beta1.QueryTotalBorrowedResponse) | TotalBorrowed queries total coins borrowed from hard liquidity pools. | GET|/kava/hard/v1beta1/total-borrowed/{denom}|
-| `InterestRate` | [QueryInterestRateRequest](#kava.hard.v1beta1.QueryInterestRateRequest) | [QueryInterestRateResponse](#kava.hard.v1beta1.QueryInterestRateResponse) | InterestRate queries the hard module interest rates. | GET|/kava/hard/v1beta1/interest-rate/{denom}|
-| `Reserves` | [QueryReservesRequest](#kava.hard.v1beta1.QueryReservesRequest) | [QueryReservesResponse](#kava.hard.v1beta1.QueryReservesResponse) | Reserves queries total hard reserve coins. | GET|/kava/hard/v1beta1/reserves/{denom}|
-| `InterestFactors` | [QueryInterestFactorsRequest](#kava.hard.v1beta1.QueryInterestFactorsRequest) | [QueryInterestFactorsResponse](#kava.hard.v1beta1.QueryInterestFactorsResponse) | InterestFactors queries hard module interest factors. | GET|/kava/hard/v1beta1/interest-factors/{denom}|
+| `TotalBorrowed` | [QueryTotalBorrowedRequest](#kava.hard.v1beta1.QueryTotalBorrowedRequest) | [QueryTotalBorrowedResponse](#kava.hard.v1beta1.QueryTotalBorrowedResponse) | TotalBorrowed queries total coins borrowed from hard liquidity pools. | GET|/kava/hard/v1beta1/total-borrowed|
+| `InterestRate` | [QueryInterestRateRequest](#kava.hard.v1beta1.QueryInterestRateRequest) | [QueryInterestRateResponse](#kava.hard.v1beta1.QueryInterestRateResponse) | InterestRate queries the hard module interest rates. | GET|/kava/hard/v1beta1/interest-rate|
+| `Reserves` | [QueryReservesRequest](#kava.hard.v1beta1.QueryReservesRequest) | [QueryReservesResponse](#kava.hard.v1beta1.QueryReservesResponse) | Reserves queries total hard reserve coins. | GET|/kava/hard/v1beta1/reserves|
+| `InterestFactors` | [QueryInterestFactorsRequest](#kava.hard.v1beta1.QueryInterestFactorsRequest) | [QueryInterestFactorsResponse](#kava.hard.v1beta1.QueryInterestFactorsResponse) | InterestFactors queries hard module interest factors. | GET|/kava/hard/v1beta1/interest-factors|
 
  <!-- end services -->
 

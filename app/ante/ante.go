@@ -4,45 +4,48 @@ import (
 	"fmt"
 	"runtime/debug"
 
+	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	authante "github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	vesting "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
-	ibcante "github.com/cosmos/ibc-go/v3/modules/core/ante"
-	ibckeeper "github.com/cosmos/ibc-go/v3/modules/core/keeper"
+	ibcante "github.com/cosmos/ibc-go/v6/modules/core/ante"
+	ibckeeper "github.com/cosmos/ibc-go/v6/modules/core/keeper"
+	evmante "github.com/evmos/ethermint/app/ante"
+	evmtypes "github.com/evmos/ethermint/x/evm/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	evmante "github.com/tharsis/ethermint/app/ante"
-	evmtypes "github.com/tharsis/ethermint/x/evm/types"
 )
 
 // HandlerOptions extend the SDK's AnteHandler options by requiring the IBC
 // channel keeper, EVM Keeper and Fee Market Keeper.
 type HandlerOptions struct {
-	AccountKeeper   evmtypes.AccountKeeper
-	BankKeeper      evmtypes.BankKeeper
-	IBCKeeper       *ibckeeper.Keeper
-	EvmKeeper       evmante.EVMKeeper
-	FeegrantKeeper  authante.FeegrantKeeper
-	SignModeHandler authsigning.SignModeHandler
-	SigGasConsumer  authante.SignatureVerificationGasConsumer
-	FeeMarketKeeper evmtypes.FeeMarketKeeper
-	MaxTxGasWanted  uint64
-	AddressFetchers []AddressFetcher
+	AccountKeeper          evmtypes.AccountKeeper
+	BankKeeper             evmtypes.BankKeeper
+	IBCKeeper              *ibckeeper.Keeper
+	EvmKeeper              evmante.EVMKeeper
+	FeegrantKeeper         authante.FeegrantKeeper
+	SignModeHandler        authsigning.SignModeHandler
+	SigGasConsumer         authante.SignatureVerificationGasConsumer
+	FeeMarketKeeper        evmtypes.FeeMarketKeeper
+	MaxTxGasWanted         uint64
+	AddressFetchers        []AddressFetcher
+	ExtensionOptionChecker authante.ExtensionOptionChecker
+	TxFeeChecker           authante.TxFeeChecker
 }
 
 func (options HandlerOptions) Validate() error {
 	if options.AccountKeeper == nil {
-		return sdkerrors.Wrap(sdkerrors.ErrLogic, "account keeper is required for AnteHandler")
+		return errorsmod.Wrap(sdkerrors.ErrLogic, "account keeper is required for AnteHandler")
 	}
 	if options.BankKeeper == nil {
-		return sdkerrors.Wrap(sdkerrors.ErrLogic, "bank keeper is required for AnteHandler")
+		return errorsmod.Wrap(sdkerrors.ErrLogic, "bank keeper is required for AnteHandler")
 	}
 	if options.SignModeHandler == nil {
-		return sdkerrors.Wrap(sdkerrors.ErrLogic, "sign mode handler is required for ante builder")
+		return errorsmod.Wrap(sdkerrors.ErrLogic, "sign mode handler is required for ante builder")
 	}
 	if options.EvmKeeper == nil {
-		return sdkerrors.Wrap(sdkerrors.ErrLogic, "evm keeper is required for AnteHandler")
+		return errorsmod.Wrap(sdkerrors.ErrLogic, "evm keeper is required for AnteHandler")
 	}
 	return nil
 }
@@ -70,7 +73,7 @@ func NewAnteHandler(options HandlerOptions) (sdk.AnteHandler, error) {
 		if ok {
 			opts := txWithExtensions.GetExtensionOptions()
 			if len(opts) > 1 {
-				return ctx, sdkerrors.Wrap(
+				return ctx, errorsmod.Wrap(
 					sdkerrors.ErrInvalidRequest,
 					"rejecting tx with more than 1 extension option",
 				)
@@ -88,7 +91,7 @@ func NewAnteHandler(options HandlerOptions) (sdk.AnteHandler, error) {
 						isEIP712:       true,
 					})
 				default:
-					return ctx, sdkerrors.Wrapf(
+					return ctx, errorsmod.Wrapf(
 						sdkerrors.ErrUnknownExtensionOptions,
 						"rejecting tx with unsupported extension option: %s", typeURL,
 					)
@@ -106,7 +109,7 @@ func NewAnteHandler(options HandlerOptions) (sdk.AnteHandler, error) {
 				isEIP712:       false,
 			})
 		default:
-			return ctx, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "invalid transaction type: %T", tx)
+			return ctx, errorsmod.Wrapf(sdkerrors.ErrUnknownRequest, "invalid transaction type: %T", tx)
 		}
 
 		return anteHandler(ctx, tx, sim)
@@ -122,7 +125,7 @@ func newCosmosAnteHandler(options cosmosHandlerOptions) sdk.AnteHandler {
 	)
 
 	if !options.isEIP712 {
-		decorators = append(decorators, authante.NewRejectExtensionOptionsDecorator())
+		decorators = append(decorators, authante.NewExtensionOptionsDecorator(options.ExtensionOptionChecker))
 	}
 
 	if len(options.AddressFetchers) > 0 {
@@ -131,28 +134,31 @@ func newCosmosAnteHandler(options cosmosHandlerOptions) sdk.AnteHandler {
 
 	var sigVerification sdk.AnteDecorator = authante.NewSigVerificationDecorator(options.AccountKeeper, options.SignModeHandler)
 	if options.isEIP712 {
-		sigVerification = evmante.NewEip712SigVerificationDecorator(options.AccountKeeper, options.SignModeHandler, options.EvmKeeper)
+		sigVerification = evmante.NewLegacyEip712SigVerificationDecorator(options.AccountKeeper, options.SignModeHandler, options.EvmKeeper)
 	}
 
 	decorators = append(decorators,
 		NewEvmMinGasFilter(options.EvmKeeper), // filter out evm denom from min-gas-prices
-		authante.NewMempoolFeeDecorator(),
 		NewVestingAccountDecorator(),
 		NewAuthzLimiterDecorator(
 			sdk.MsgTypeURL(&evmtypes.MsgEthereumTx{}),
 			sdk.MsgTypeURL(&vesting.MsgCreateVestingAccount{}),
+			sdk.MsgTypeURL(&vesting.MsgCreatePermanentLockedAccount{}),
+			sdk.MsgTypeURL(&vesting.MsgCreatePeriodicVestingAccount{}),
 		),
 		authante.NewValidateBasicDecorator(),
 		authante.NewTxTimeoutHeightDecorator(),
+		// If ethermint x/feemarket is enabled, align Cosmos min fee with the EVM
+		// evmante.NewMinGasPriceDecorator(options.FeeMarketKeeper, options.EvmKeeper),
 		authante.NewValidateMemoDecorator(options.AccountKeeper),
 		authante.NewConsumeGasForTxSizeDecorator(options.AccountKeeper),
-		authante.NewDeductFeeDecorator(options.AccountKeeper, options.BankKeeper, options.FeegrantKeeper),
+		authante.NewDeductFeeDecorator(options.AccountKeeper, options.BankKeeper, options.FeegrantKeeper, options.TxFeeChecker),
 		authante.NewSetPubKeyDecorator(options.AccountKeeper), // SetPubKeyDecorator must be called before all signature verification decorators
 		authante.NewValidateSigCountDecorator(options.AccountKeeper),
 		authante.NewSigGasConsumeDecorator(options.AccountKeeper, options.SigGasConsumer),
 		sigVerification,
 		authante.NewIncrementSequenceDecorator(options.AccountKeeper), // innermost AnteDecorator
-		ibcante.NewAnteDecorator(options.IBCKeeper),
+		ibcante.NewRedundantRelayDecorator(options.IBCKeeper),
 	)
 	return sdk.ChainAnteDecorators(decorators...)
 }
@@ -163,16 +169,17 @@ func newEthAnteHandler(options HandlerOptions) sdk.AnteHandler {
 		evmante.NewEthMempoolFeeDecorator(options.EvmKeeper),   // Check eth effective gas price against minimal-gas-prices
 		evmante.NewEthValidateBasicDecorator(options.EvmKeeper),
 		evmante.NewEthSigVerificationDecorator(options.EvmKeeper),
-		evmante.NewEthAccountVerificationDecorator(options.AccountKeeper, options.BankKeeper, options.EvmKeeper),
-		evmante.NewEthGasConsumeDecorator(options.EvmKeeper, options.MaxTxGasWanted),
+		evmante.NewEthAccountVerificationDecorator(options.AccountKeeper, options.EvmKeeper),
 		evmante.NewCanTransferDecorator(options.EvmKeeper),
+		evmante.NewEthGasConsumeDecorator(options.EvmKeeper, options.MaxTxGasWanted),
 		evmante.NewEthIncrementSenderSequenceDecorator(options.AccountKeeper), // innermost AnteDecorator.
+		evmante.NewEthEmitEventDecorator(options.EvmKeeper),                   // emit eth tx hash and index at the very last ante handler.
 	)
 }
 
 func Recover(logger tmlog.Logger, err *error) {
 	if r := recover(); r != nil {
-		*err = sdkerrors.Wrapf(sdkerrors.ErrPanic, "%v", r)
+		*err = errorsmod.Wrapf(sdkerrors.ErrPanic, "%v", r)
 
 		if e, ok := r.(error); ok {
 			logger.Error(

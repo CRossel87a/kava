@@ -31,8 +31,25 @@ func HandleCommunityPoolLendWithdrawProposal(ctx sdk.Context, k Keeper, p *types
 	}
 
 	balanceAfter := k.bankKeeper.GetAllBalances(ctx, k.moduleAddress)
-	totalWithdrawn := balanceAfter.Sub(balanceBefore)
+	totalWithdrawn := balanceAfter.Sub(balanceBefore...)
 
 	// send all withdrawn coins back to community pool
 	return k.distrKeeper.FundCommunityPool(ctx, totalWithdrawn, k.moduleAddress)
+}
+
+// HandleCommunityCDPRepayDebtProposal is a handler for executing a passed community pool cdp repay debt proposal.
+func HandleCommunityCDPRepayDebtProposal(ctx sdk.Context, k Keeper, p *types.CommunityCDPRepayDebtProposal) error {
+	// make debt repayment
+	return k.cdpKeeper.RepayPrincipal(ctx, k.moduleAddress, p.CollateralType, p.Payment)
+}
+
+// HandleCommunityCDPWithdrawCollateralProposal is a handler for executing a
+// passed community pool cdp withdraw collateral proposal.
+func HandleCommunityCDPWithdrawCollateralProposal(
+	ctx sdk.Context,
+	k Keeper,
+	p *types.CommunityCDPWithdrawCollateralProposal,
+) error {
+	// withdraw collateral
+	return k.cdpKeeper.WithdrawCollateral(ctx, k.moduleAddress, k.moduleAddress, p.Collateral, p.CollateralType)
 }

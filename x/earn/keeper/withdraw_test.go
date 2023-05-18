@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"testing"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/kava-labs/kava/x/earn/testutil"
@@ -52,7 +53,7 @@ func (suite *withdrawTestSuite) TestWithdraw_NoVaultShareRecord() {
 	vaultDenom := "usdx"
 	startBalance := sdk.NewInt64Coin(vaultDenom, 1000)
 
-	acc1DepositAmount := sdk.NewCoin(vaultDenom, sdk.NewInt(100))
+	acc1DepositAmount := sdk.NewCoin(vaultDenom, sdkmath.NewInt(100))
 	acc2WithdrawAmount := sdk.NewInt64Coin(vaultDenom, 100)
 
 	suite.CreateVault(vaultDenom, types.StrategyTypes{types.STRATEGY_TYPE_HARD}, false, nil)
@@ -77,7 +78,7 @@ func (suite *withdrawTestSuite) TestWithdraw_NoVaultShareRecord() {
 
 	suite.VaultTotalValuesEqual(sdk.NewCoins(acc1DepositAmount))
 	suite.VaultTotalSharesEqual(types.NewVaultShares(
-		types.NewVaultShare(acc1DepositAmount.Denom, acc1DepositAmount.Amount.ToDec()),
+		types.NewVaultShare(acc1DepositAmount.Denom, sdk.NewDecFromInt(acc1DepositAmount.Amount)),
 	))
 }
 
@@ -106,7 +107,7 @@ func (suite *withdrawTestSuite) TestWithdraw_ExceedBalance() {
 
 	suite.VaultTotalValuesEqual(sdk.NewCoins(depositAmount))
 	suite.VaultTotalSharesEqual(types.NewVaultShares(
-		types.NewVaultShare(depositAmount.Denom, depositAmount.Amount.ToDec()),
+		types.NewVaultShare(depositAmount.Denom, sdk.NewDecFromInt(depositAmount.Amount)),
 	))
 }
 

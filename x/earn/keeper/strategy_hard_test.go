@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"testing"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/kava-labs/kava/x/earn/testutil"
@@ -46,7 +47,7 @@ func (suite *strategyHardTestSuite) TestDeposit_SingleAcc() {
 	suite.HardDepositAmountEqual(sdk.NewCoins(depositAmount))
 	suite.VaultTotalValuesEqual(sdk.NewCoins(depositAmount))
 	suite.VaultTotalSharesEqual(types.NewVaultShares(
-		types.NewVaultShare(depositAmount.Denom, depositAmount.Amount.ToDec()),
+		types.NewVaultShare(depositAmount.Denom, sdk.NewDecFromInt(depositAmount.Amount)),
 	))
 
 	// Query vault total
@@ -76,7 +77,7 @@ func (suite *strategyHardTestSuite) TestDeposit_SingleAcc_MultipleDeposits() {
 	suite.HardDepositAmountEqual(sdk.NewCoins(expectedVaultBalance))
 	suite.VaultTotalValuesEqual(sdk.NewCoins(expectedVaultBalance))
 	suite.VaultTotalSharesEqual(types.NewVaultShares(
-		types.NewVaultShare(expectedVaultBalance.Denom, expectedVaultBalance.Amount.ToDec()),
+		types.NewVaultShare(expectedVaultBalance.Denom, sdk.NewDecFromInt(expectedVaultBalance.Amount)),
 	))
 
 	// Query vault total
@@ -112,7 +113,7 @@ func (suite *strategyHardTestSuite) TestDeposit_MultipleAcc_MultipleDeposits() {
 	suite.HardDepositAmountEqual(sdk.NewCoins(expectedTotalValue))
 	suite.VaultTotalValuesEqual(sdk.NewCoins(expectedTotalValue))
 	suite.VaultTotalSharesEqual(types.NewVaultShares(
-		types.NewVaultShare(expectedTotalValue.Denom, expectedTotalValue.Amount.ToDec()),
+		types.NewVaultShare(expectedTotalValue.Denom, sdk.NewDecFromInt(expectedTotalValue.Amount)),
 	))
 
 	// Query vault total
@@ -260,7 +261,7 @@ func (suite *strategyHardTestSuite) TestWithdraw_WithAccumulatedHard() {
 	// Query account value
 	accValue, err := suite.Keeper.GetVaultAccountValue(suite.Ctx, vaultDenom, acc)
 	suite.Require().NoError(err)
-	suite.Equal(depositAmount.AddAmount(sdk.NewInt(10)), accValue)
+	suite.Equal(depositAmount.AddAmount(sdkmath.NewInt(10)), accValue)
 
 	// Withdraw 100, 10 remaining
 	_, err = suite.Keeper.Withdraw(suite.Ctx, acc, depositAmount, types.STRATEGY_TYPE_HARD)
@@ -276,11 +277,11 @@ func (suite *strategyHardTestSuite) TestWithdraw_WithAccumulatedHard() {
 	)
 
 	// Half of remaining 10, 5 remaining
-	_, err = suite.Keeper.Withdraw(suite.Ctx, acc, sdk.NewCoin(vaultDenom, sdk.NewInt(5)), types.STRATEGY_TYPE_HARD)
+	_, err = suite.Keeper.Withdraw(suite.Ctx, acc, sdk.NewCoin(vaultDenom, sdkmath.NewInt(5)), types.STRATEGY_TYPE_HARD)
 	suite.Require().NoError(err)
 
 	// Withdraw all
-	_, err = suite.Keeper.Withdraw(suite.Ctx, acc, sdk.NewCoin(vaultDenom, sdk.NewInt(5)), types.STRATEGY_TYPE_HARD)
+	_, err = suite.Keeper.Withdraw(suite.Ctx, acc, sdk.NewCoin(vaultDenom, sdkmath.NewInt(5)), types.STRATEGY_TYPE_HARD)
 	suite.Require().NoError(err)
 
 	accValue, err = suite.Keeper.GetVaultAccountValue(suite.Ctx, vaultDenom, acc)
@@ -330,7 +331,7 @@ func (suite *strategyHardTestSuite) TestAccountShares() {
 	acc2Value, err := suite.Keeper.GetVaultAccountValue(suite.Ctx, vaultDenom, acc2)
 	suite.Require().NoError(err)
 	suite.Equal(
-		sdk.NewInt(99),
+		sdkmath.NewInt(99),
 		acc2Value.Amount,
 		"value 1 less than deposit amount with different share price, decimals truncated",
 	)
@@ -401,7 +402,7 @@ func (suite *strategyHardTestSuite) TestWithdraw_AccumulatedAmount() {
 	suite.Require().NoError(err)
 
 	// 3. Withdraw all from acc1 - including accumulated amount
-	_, err = suite.Keeper.Withdraw(suite.Ctx, acc1, depositAmount.AddAmount(sdk.NewInt(10)), types.STRATEGY_TYPE_HARD)
+	_, err = suite.Keeper.Withdraw(suite.Ctx, acc1, depositAmount.AddAmount(sdkmath.NewInt(10)), types.STRATEGY_TYPE_HARD)
 	suite.Require().NoError(err)
 
 	_, found = suite.Keeper.GetVaultAccountShares(suite.Ctx, acc1)
@@ -441,10 +442,10 @@ func (suite *strategyHardTestSuite) TestWithdraw_AccumulatedTruncated() {
 
 	accBal, err := suite.Keeper.GetVaultAccountValue(suite.Ctx, vaultDenom, acc1)
 	suite.Require().NoError(err)
-	suite.Equal(depositAmount.AddAmount(sdk.NewInt(5)), accBal, "acc1 should have 105 usdx")
+	suite.Equal(depositAmount.AddAmount(sdkmath.NewInt(5)), accBal, "acc1 should have 105 usdx")
 
 	// 3. Withdraw all from acc1 - including accumulated amount
-	_, err = suite.Keeper.Withdraw(suite.Ctx, acc1, depositAmount.AddAmount(sdk.NewInt(5)), types.STRATEGY_TYPE_HARD)
+	_, err = suite.Keeper.Withdraw(suite.Ctx, acc1, depositAmount.AddAmount(sdkmath.NewInt(5)), types.STRATEGY_TYPE_HARD)
 	suite.Require().NoError(err)
 
 	acc1Shares, found = suite.Keeper.GetVaultAccountShares(suite.Ctx, acc1)
@@ -482,7 +483,7 @@ func (suite *strategyHardTestSuite) TestWithdraw_ExpensiveShares() {
 
 	accBal, err := suite.Keeper.GetVaultAccountValue(suite.Ctx, vaultDenom, acc1)
 	suite.Require().NoError(err)
-	suite.Equal(sdk.NewInt(2000), accBal.Amount, "acc1 should have 2000 usdx")
+	suite.Equal(sdkmath.NewInt(2000), accBal.Amount, "acc1 should have 2000 usdx")
 
 	// 3. Withdraw all from acc1 - including accumulated amount
 	_, err = suite.Keeper.Withdraw(suite.Ctx, acc1, sdk.NewInt64Coin(vaultDenom, 2000), types.STRATEGY_TYPE_HARD)
