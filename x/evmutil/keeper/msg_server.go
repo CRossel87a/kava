@@ -21,6 +21,10 @@ func NewMsgServerImpl(keeper Keeper) types.MsgServer {
 
 var _ types.MsgServer = msgServer{}
 
+////////////////////////////
+// EVM-native assets -> Cosmos SDK
+////////////////////////////
+
 // ConvertCoinToERC20 handles a MsgConvertCoinToERC20 message to convert
 // sdk.Coin to Kava EVM tokens.
 func (s msgServer) ConvertCoinToERC20(
@@ -101,4 +105,85 @@ func (s msgServer) ConvertERC20ToCoin(
 	)
 
 	return &types.MsgConvertERC20ToCoinResponse{}, nil
+}
+
+////////////////////////////
+// Cosmos SDK-native assets -> EVM
+////////////////////////////
+
+// ConvertCosmosCoinToERC20 converts a native sdk.Coin to an ERC20.
+// If no ERC20 contract has been deployed for the given denom, a new
+// contract will be deployed and registered to the module.
+func (s msgServer) ConvertCosmosCoinToERC20(
+	goCtx context.Context,
+	msg *types.MsgConvertCosmosCoinToERC20,
+) (*types.MsgConvertCosmosCoinToERC20Response, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+
+	initiator, err := sdk.AccAddressFromBech32(msg.Initiator)
+	if err != nil {
+		return nil, fmt.Errorf("invalid initiator address: %w", err)
+	}
+
+	receiver, err := types.NewInternalEVMAddressFromString(msg.Receiver)
+	if err != nil {
+		return nil, fmt.Errorf("invalid receiver address: %w", err)
+	}
+
+	if err := s.keeper.ConvertCosmosCoinToERC20(
+		ctx,
+		initiator,
+		receiver,
+		*msg.Amount,
+	); err != nil {
+		return nil, err
+	}
+
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			sdk.EventTypeMessage,
+			sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
+			sdk.NewAttribute(sdk.AttributeKeySender, msg.Initiator),
+		),
+	)
+
+	return &types.MsgConvertCosmosCoinToERC20Response{}, nil
+}
+
+// ConvertCosmosCoinFromERC20 converts an ERC20 representation of a cosmos-native asset
+// back into an sdk.Coin.
+func (s msgServer) ConvertCosmosCoinFromERC20(
+	goCtx context.Context,
+	msg *types.MsgConvertCosmosCoinFromERC20,
+) (*types.MsgConvertCosmosCoinFromERC20Response, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+
+	initiator, err := types.NewInternalEVMAddressFromString(msg.Initiator)
+	if err != nil {
+		return nil, fmt.Errorf("invalid initiator address: %w", err)
+	}
+
+	receiver, err := sdk.AccAddressFromBech32(msg.Receiver)
+	if err != nil {
+		return nil, fmt.Errorf("invalid receiver address: %w", err)
+	}
+
+	if err := s.keeper.ConvertCosmosCoinFromERC20(
+		ctx,
+		initiator,
+		receiver,
+		*msg.Amount,
+	); err != nil {
+		return nil, err
+	}
+
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			sdk.EventTypeMessage,
+			sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
+			sdk.NewAttribute(sdk.AttributeKeySender, msg.Initiator),
+		),
+	)
+
+	return &types.MsgConvertCosmosCoinFromERC20Response{}, nil
 }

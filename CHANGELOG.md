@@ -36,6 +36,39 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ## [Unreleased]
 
+### Features
+- (evmutil) [#1590] & [#1596] Add allow list param of sdk native denoms that can be transferred to evm
+- (evmutil) [#1591] & [#1596] Configure module to support deploying ERC20KavaWrappedCosmosCoin contracts
+- (evmutil) [#1598] Track deployed ERC20 contract addresses for representing cosmos coins in module state
+- (evmutil) [#1603] Add MsgConvertCosmosCoinToERC20 for converting an sdk.Coin to an ERC20 in the EVM
+- (evmutil) [#1604] Emit events for MsgConvertCosmosCoinToERC20: `message` & `convert_cosmos_coin_to_erc20`
+- (evmutil) [#1605] Add query for deployed ERC20 contracts representing Cosmos coins in the EVM
+- (evmutil) [#1609] Add MsgConvertCosmosCoinFromERC20 for converting the ERC20 back to an sdk.Coin
+- (evmutil) [#1610] Add new invariant checking that ERC20s are fully backed by sdk.Coins
+
+### Client Breaking
+- (evmutil) [#1603] Renamed error `ErrConversionNotEnabled` to `ErrEVMConversionNotEnabled`
+- (evmutil) [#1604] Renamed event types
+  - `convert_erc20_to_coin` -> `convert_evm_erc20_to_coin`
+  - `convert_coin_to_erc20` -> `convert_evm_erc20_from_coin`
+- (evmutil) [#1614] Renamed CLI commands for converting an EVM-native asset to sdk.Coin
+  NOTE: no changes were made to existing Msg names (`MsgConvertCoinToERC20` & `MsgConvertERC20ToCoin`)
+  - `convert-erc20-to-coin` -> `convert-evm-erc20-to-coin`
+  - `convert-coin-to-erc20` -> `convert-evm-erc20-from-coin`
+- (cli) [#1624] Removes unused, no-op `migrate` CLI command.
+
+### Bug Fixes
+- (cli) [#1624] Fix `assert-invariants` CLI command.
+
+
+## [v0.23.2]
+
+### Bug Fixes
+
+- (deps) [#1622] Bump tm-db to v0.6.7-kava.3 to return rocksdb open error
+
+## [v0.23.0]
+
 ### Improvements
 
 - (deps) [#1477] Bump Cosmos SDK to v0.46.10.
@@ -235,6 +268,18 @@ the [changelog](https://github.com/cosmos/cosmos-sdk/blob/v0.38.4/CHANGELOG.md).
 - [#257](https://github.com/Kava-Labs/kava/pulls/257) Include scripts to run
   large-scale simulations remotely using aws-batch
 
+[#1624]: https://github.com/Kava-Labs/kava/pull/1624
+[#1622]: https://github.com/Kava-Labs/kava/pull/1622
+[#1614]: https://github.com/Kava-Labs/kava/pull/1614
+[#1610]: https://github.com/Kava-Labs/kava/pull/1610
+[#1609]: https://github.com/Kava-Labs/kava/pull/1609
+[#1605]: https://github.com/Kava-Labs/kava/pull/1605
+[#1604]: https://github.com/Kava-Labs/kava/pull/1604
+[#1603]: https://github.com/Kava-Labs/kava/pull/1603
+[#1598]: https://github.com/Kava-Labs/kava/pull/1598
+[#1596]: https://github.com/Kava-Labs/kava/pull/1596
+[#1591]: https://github.com/Kava-Labs/kava/pull/1591
+[#1590]: https://github.com/Kava-Labs/kava/pull/1590
 [#1568]: https://github.com/Kava-Labs/kava/pull/1568
 [#1567]: https://github.com/Kava-Labs/kava/pull/1567
 [#1566]: https://github.com/Kava-Labs/kava/pull/1566
@@ -262,7 +307,10 @@ the [changelog](https://github.com/cosmos/cosmos-sdk/blob/v0.38.4/CHANGELOG.md).
 [#750]: https://github.com/Kava-Labs/kava/pull/750
 [#751]: https://github.com/Kava-Labs/kava/pull/751
 [#780]: https://github.com/Kava-Labs/kava/pull/780
-[unreleased]: https://github.com/Kava-Labs/kava/compare/v0.21.1...HEAD
+[unreleased]: https://github.com/Kava-Labs/kava/compare/v0.23.2...HEAD
+[v0.23.2]: https://github.com/Kava-Labs/kava/compare/v0.23.1...v0.23.2
+[v0.23.1]: https://github.com/Kava-Labs/kava/compare/v0.23.0...v0.23.1
+[v0.23.0]: https://github.com/Kava-Labs/kava/compare/v0.21.1...v0.23.0
 [v0.16.1]: https://github.com/Kava-Labs/kava/compare/v0.16.0...v0.16.1
 [v0.16.0]: https://github.com/Kava-Labs/kava/compare/v0.15.2...v0.16.0
 [v0.13.0]: https://github.com/Kava-Labs/kava/compare/v0.12.4...v0.13.0

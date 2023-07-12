@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -16,7 +17,10 @@ import (
 )
 
 const (
-	erc20BalanceOfMethod = "balanceOf"
+	erc20BalanceOfMethod   = "balanceOf"
+	erc20BurnMethod        = "burn"
+	erc20MintMethod        = "mint"
+	erc20TotalSupplyMethod = "totalSupply"
 )
 
 // DeployTestMintableERC20Contract deploys an ERC20 contract on the EVM as the
@@ -64,6 +68,77 @@ func (k Keeper) DeployTestMintableERC20Contract(
 	return types.NewInternalEVMAddress(contractAddr), nil
 }
 
+// DeployKavaWrappedCosmosCoinERC20Contract validates token details and then deploys an ERC20
+// contract with the token metadata.
+// This method does NOT check if a token for the provided SdkDenom has already been deployed.
+func (k Keeper) DeployKavaWrappedCosmosCoinERC20Contract(
+	ctx sdk.Context,
+	token types.AllowedCosmosCoinERC20Token,
+) (types.InternalEVMAddress, error) {
+	if err := token.Validate(); err != nil {
+		return types.InternalEVMAddress{}, errorsmod.Wrapf(err, "failed to deploy erc20 for sdk denom %s", token.CosmosDenom)
+	}
+
+	packedAbi, err := types.ERC20KavaWrappedCosmosCoinContract.ABI.Pack(
+		"", // Empty string for contract constructor
+		token.Name,
+		token.Symbol,
+		uint8(token.Decimals), // cast to uint8 is safe because of Validate()
+	)
+	if err != nil {
+		return types.InternalEVMAddress{}, errorsmod.Wrapf(err, "failed to pack token with details %+v", token)
+	}
+
+	data := make([]byte, len(types.ERC20KavaWrappedCosmosCoinContract.Bin)+len(packedAbi))
+	copy(
+		data[:len(types.ERC20KavaWrappedCosmosCoinContract.Bin)],
+		types.ERC20KavaWrappedCosmosCoinContract.Bin,
+	)
+	copy(
+		data[len(types.ERC20KavaWrappedCosmosCoinContract.Bin):],
+		packedAbi,
+	)
+
+	nonce, err := k.accountKeeper.GetSequence(ctx, types.ModuleEVMAddress.Bytes())
+	if err != nil {
+		return types.InternalEVMAddress{}, err
+	}
+
+	contractAddr := crypto.CreateAddress(types.ModuleEVMAddress, nonce)
+	_, err = k.CallEVMWithData(ctx, types.ModuleEVMAddress, nil, data)
+	if err != nil {
+		return types.InternalEVMAddress{}, fmt.Errorf("failed to deploy ERC20 %s (nonce=%d, data=%s): %s", token.Name, nonce, hex.EncodeToString(data), err)
+	}
+
+	return types.NewInternalEVMAddress(contractAddr), nil
+}
+
+// GetOrDeployCosmosCoinERC20Contract checks the module store for a deployed contract for the given
+// token info and returns it if preset. Otherwise, it deploys and registers the contract.
+func (k *Keeper) GetOrDeployCosmosCoinERC20Contract(
+	ctx sdk.Context,
+	tokenInfo types.AllowedCosmosCoinERC20Token,
+) (types.InternalEVMAddress, error) {
+	contractAddress, found := k.GetDeployedCosmosCoinContract(ctx, tokenInfo.CosmosDenom)
+	if found {
+		// contract has already been deployed
+		return contractAddress, nil
+	}
+
+	// deploy a new contract
+	contractAddress, err := k.DeployKavaWrappedCosmosCoinERC20Contract(ctx, tokenInfo)
+	if err != nil {
+		return contractAddress, err
+	}
+
+	// register the contract to the module store
+	err = k.SetDeployedCosmosCoinContract(ctx, tokenInfo.CosmosDenom, contractAddress)
+
+	// TODO: emit event that contract was deployed
+
+	return contractAddress, err
+}
+
 // MintERC20 mints the given amount of an ERC20 token to an address. This is
 // unchecked and should only be called after permission and enabled ERC20 checks.
 func (k Keeper) MintERC20(
@@ -77,7 +152,7 @@ func (k Keeper) MintERC20(
 		types.ERC20MintableBurnableContract.ABI,
 		types.ModuleEVMAddress,
 		contractAddr,
-		"mint",
+		erc20MintMethod,
 		// Mint ERC20 args
 		receiver.Address,
 		amount,
@@ -86,6 +161,29 @@ func (k Keeper) MintERC20(
 	return err
 }
 
+// BurnERC20 burns the token amount from the initiator's balance.
+func (k Keeper) BurnERC20(
+	ctx sdk.Context,
+	contractAddr types.InternalEVMAddress,
+	initiator types.InternalEVMAddress,
+	amount *big.Int,
+) error {
+	_, err := k.CallEVM(
+		ctx,
+		types.ERC20KavaWrappedCosmosCoinContract.ABI,
+		types.ModuleEVMAddress,
+		contractAddr,
+		erc20BurnMethod,
+		// Burn ERC20 args
+		initiator.Address,
+		amount,
+	)
+
+	return err
+}
+
+// QueryERC20BalanceOf makes a contract call to the balanceOf method of the ERC20 contract to get
+// the ERC20 balance of the given account.
 func (k Keeper) QueryERC20BalanceOf(
 	ctx sdk.Context,
 	contractAddr types.InternalEVMAddress,
@@ -104,6 +202,31 @@ func (k Keeper) QueryERC20BalanceOf(
 		return nil, err
 	}
 
+	return unpackERC20ResToBigInt(res, erc20BalanceOfMethod)
+}
+
+// QueryERC20TotalSupply makes a contract call to the totalSupply method of the ERC20 contract to
+// get the total supply of the token.
+func (k Keeper) QueryERC20TotalSupply(
+	ctx sdk.Context,
+	contractAddr types.InternalEVMAddress,
+) (*big.Int, error) {
+	res, err := k.CallEVM(
+		ctx,
+		types.ERC20KavaWrappedCosmosCoinContract.ABI,
+		types.ModuleEVMAddress,
+		contractAddr,
+		erc20TotalSupplyMethod,
+		// totalSupply takes no args
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return unpackERC20ResToBigInt(res, erc20TotalSupplyMethod)
+}
+
+func unpackERC20ResToBigInt(res *evmtypes.MsgEthereumTxResponse, methodName string) (*big.Int, error) {
 	if res.Failed() {
 		if res.VmError == vm.ErrExecutionReverted.Error() {
 			// Unpacks revert
@@ -113,11 +236,11 @@ func (k Keeper) QueryERC20BalanceOf(
 		return nil, status.Error(codes.Internal, res.VmError)
 	}
 
-	anyOutput, err := types.ERC20MintableBurnableContract.ABI.Unpack(erc20BalanceOfMethod, res.Ret)
+	anyOutput, err := types.ERC20MintableBurnableContract.ABI.Unpack(methodName, res.Ret)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to unpack method %v response: %w",
-			erc20BalanceOfMethod,
+			methodName,
 			err,
 		)
 	}
@@ -125,7 +248,7 @@ func (k Keeper) QueryERC20BalanceOf(
 	if len(anyOutput) != 1 {
 		return nil, fmt.Errorf(
 			"invalid ERC20 %v call return outputs %v, expected %v",
-			erc20BalanceOfMethod,
+			methodName,
 			len(anyOutput),
 			1,
 		)

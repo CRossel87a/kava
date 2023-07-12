@@ -72,12 +72,10 @@ func (suite *Suite) SetupTest() {
 	suite.EvmModuleAddr = suite.AccountKeeper.GetModuleAddress(evmtypes.ModuleName)
 
 	// test evm user keys that have no minting permissions
-	key1, err := ethsecp256k1.GenerateKey()
-	suite.Require().NoError(err)
-	suite.Key1 = key1
-	suite.Key1Addr = types.NewInternalEVMAddress(common.BytesToAddress(suite.Key1.PubKey().Address()))
-	suite.Key2, err = ethsecp256k1.GenerateKey()
-	suite.Require().NoError(err)
+	addr, privKey := RandomEvmAccount()
+	suite.Key1 = privKey
+	suite.Key1Addr = types.NewInternalEVMAddress(addr)
+	_, suite.Key2 = RandomEvmAccount()
 
 	_, addrs := app.GeneratePrivKeyAddressPairs(4)
 	suite.Addrs = addrs
@@ -156,12 +154,13 @@ func (suite *Suite) SetupTest() {
 				"erc20/usdc",
 			),
 		),
+		types.NewAllowedCosmosCoinERC20Tokens(),
 	))
 
 	queryHelper := baseapp.NewQueryServerTestHelper(suite.Ctx, suite.App.InterfaceRegistry())
 	evmtypes.RegisterQueryServer(queryHelper, suite.App.GetEvmKeeper())
 	suite.QueryClientEvm = evmtypes.NewQueryClient(queryHelper)
-	types.RegisterQueryServer(queryHelper, keeper.NewQueryServerImpl(suite.App.GetEvmutilKeeper()))
+	types.RegisterQueryServer(queryHelper, keeper.NewQueryServerImpl(suite.Keeper))
 	suite.QueryClient = types.NewQueryClient(queryHelper)
 
 	// We need to commit so that the ethermint feemarket beginblock runs to set the minfee
@@ -179,6 +178,10 @@ func (suite *Suite) Commit() {
 
 	// update ctx
 	suite.Ctx = suite.App.NewContext(false, header)
+}
+
+func (suite *Suite) ModuleBalance(denom string) sdk.Int {
+	return suite.App.GetModuleAccountBalance(suite.Ctx, types.ModuleName, denom)
 }
 
 func (suite *Suite) FundAccountWithKava(addr sdk.AccAddress, coins sdk.Coins) {
@@ -360,15 +363,25 @@ func (suite *Suite) GetEvents() sdk.Events {
 // EventsContains asserts that the expected event is in the provided events
 func (suite *Suite) EventsContains(events sdk.Events, expectedEvent sdk.Event) {
 	foundMatch := false
+	var possibleFailedMatch []sdk.Attribute
+	expectedAttrs := attrsToMap(expectedEvent.Attributes)
+
 	for _, event := range events {
 		if event.Type == expectedEvent.Type {
-			if reflect.DeepEqual(attrsToMap(expectedEvent.Attributes), attrsToMap(event.Attributes)) {
+			attrs := attrsToMap(event.Attributes)
+			if reflect.DeepEqual(expectedAttrs, attrs) {
 				foundMatch = true
+			} else {
+				possibleFailedMatch = attrs
 			}
 		}
 	}
 
-	suite.Truef(foundMatch, "event of type %s not found or did not match", expectedEvent.Type)
+	if !foundMatch && possibleFailedMatch != nil {
+		suite.ElementsMatch(expectedAttrs, possibleFailedMatch, "unmatched attributes on event of type %s", expectedEvent.Type)
+	} else {
+		suite.Truef(foundMatch, "event of type %s not found", expectedEvent.Type)
+	}
 }
 
 // EventsDoNotContain asserts that the event is **not** is in the provided events
@@ -381,6 +394,11 @@ func (suite *Suite) EventsDoNotContain(events sdk.Events, eventType string) {
 	}
 
 	suite.Falsef(foundMatch, "event of type %s should not be found, but was found", eventType)
+}
+
+// BigIntsEqual is a helper method for comparing the equality of two big ints
+func (suite *Suite) BigIntsEqual(expected *big.Int, actual *big.Int, msg string) {
+	suite.Truef(expected.Cmp(actual) == 0, "%s (expected: %s, actual: %s)", msg, expected.String(), actual.String())
 }
 
 func attrsToMap(attrs []abci.EventAttribute) []sdk.Attribute {
@@ -402,4 +420,22 @@ func MustNewInternalEVMAddressFromString(addrStr string) types.InternalEVMAddres
 	}
 
 	return addr
+}
+
+func RandomEvmAccount() (common.Address, *ethsecp256k1.PrivKey) {
+	privKey, err := ethsecp256k1.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	addr := common.BytesToAddress(privKey.PubKey().Address())
+	return addr, privKey
+}
+
+func RandomEvmAddress() common.Address {
+	addr, _ := RandomEvmAccount()
+	return addr
+}
+
+func RandomInternalEVMAddress() types.InternalEVMAddress {
+	return types.NewInternalEVMAddress(RandomEvmAddress())
 }

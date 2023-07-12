@@ -17,11 +17,28 @@ const (
 	RouterKey = ModuleName
 )
 
-var AccountStoreKeyPrefix = []byte{0x00} // prefix for keys that store accounts
+// KVStore keys
+var (
+	// AccountStoreKeyPrefix is the prefix for keys that store accounts
+	AccountStoreKeyPrefix = []byte{0x00}
+	// DeployedCosmosCoinContractKeyPrefix is the key for storing deployed KavaWrappedCosmosCoinERC20s contract addresses
+	DeployedCosmosCoinContractKeyPrefix = []byte{0x01}
+)
 
 // AccountStoreKey turns an address to a key used to get the account from the store
 func AccountStoreKey(addr sdk.AccAddress) []byte {
 	return append(AccountStoreKeyPrefix, address.MustLengthPrefix(addr)...)
+}
+
+// DeployedCosmosCoinContractKey gives the store key that holds the address of the deployed ERC20
+// that wraps the given cosmosDenom sdk.Coin
+func DeployedCosmosCoinContractKey(cosmosDenom string) []byte {
+	return append(DeployedCosmosCoinContractKeyPrefix, []byte(cosmosDenom)...)
+}
+
+// DenomFromDeployedCosmosCoinContractKey is the inverse of DeployedCosmosCoinContractKey
+func DenomFromDeployedCosmosCoinContractKey(key []byte) string {
+	return string(key[1:])
 }
 
 // ModuleAddress is the native module address for EVM

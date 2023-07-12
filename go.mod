@@ -9,7 +9,7 @@ require (
 	github.com/cosmos/cosmos-proto v1.0.0-beta.3
 	github.com/cosmos/cosmos-sdk v0.46.11
 	github.com/cosmos/go-bip39 v1.0.0
-	github.com/cosmos/ibc-go/v6 v6.1.0
+	github.com/cosmos/ibc-go/v6 v6.1.1
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/evmos/ethermint v0.21.0
 	github.com/gogo/protobuf v1.3.3
@@ -129,7 +129,7 @@ require (
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/lib/pq v1.10.7 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
-	github.com/linxGnu/grocksdb v1.7.14 // indirect
+	github.com/linxGnu/grocksdb v1.7.15 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -216,5 +216,5 @@ replace (
 	// Use cometbft fork of tendermint
 	github.com/tendermint/tendermint => github.com/CRossel87a/cometbft v0.34.27
 	// Indirect dependencies still use tendermint/tm-db
-	github.com/tendermint/tm-db => github.com/kava-labs/tm-db v0.6.7-kava.1
+	github.com/tendermint/tm-db => github.com/kava-labs/tm-db v0.6.7-kava.3
 )

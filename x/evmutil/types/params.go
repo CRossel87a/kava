@@ -6,8 +6,10 @@ import (
 
 // Parameter keys and default values
 var (
-	KeyEnabledConversionPairs = []byte("EnabledConversionPairs")
-	DefaultConversionPairs    = ConversionPairs{}
+	KeyEnabledConversionPairs  = []byte("EnabledConversionPairs")
+	DefaultConversionPairs     = ConversionPairs{}
+	KeyAllowedCosmosDenoms     = []byte("AllowedCosmosDenoms")
+	DefaultAllowedCosmosDenoms = AllowedCosmosCoinERC20Tokens{}
 )
 
 // ParamKeyTable for evmutil module.
@@ -20,15 +22,18 @@ func ParamKeyTable() paramtypes.KeyTable {
 func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 	return paramtypes.ParamSetPairs{
 		paramtypes.NewParamSetPair(KeyEnabledConversionPairs, &p.EnabledConversionPairs, validateConversionPairs),
+		paramtypes.NewParamSetPair(KeyAllowedCosmosDenoms, &p.AllowedCosmosDenoms, validateAllowedCosmosCoinERC20Tokens),
 	}
 }
 
 // NewParams returns new evmutil module Params.
 func NewParams(
 	conversionPairs ConversionPairs,
+	allowedCosmosDenoms AllowedCosmosCoinERC20Tokens,
 ) Params {
 	return Params{
 		EnabledConversionPairs: conversionPairs,
+		AllowedCosmosDenoms:    allowedCosmosDenoms,
 	}
 }
 
@@ -36,12 +41,16 @@ func NewParams(
 func DefaultParams() Params {
 	return NewParams(
 		DefaultConversionPairs,
+		DefaultAllowedCosmosDenoms,
 	)
 }
 
-// Validate returns an error if the Parmas is invalid.
+// Validate returns an error if the Params is invalid.
 func (p *Params) Validate() error {
 	if err := p.EnabledConversionPairs.Validate(); err != nil {
+		return err
+	}
+	if err := p.AllowedCosmosDenoms.Validate(); err != nil {
 		return err
 	}
 	return nil

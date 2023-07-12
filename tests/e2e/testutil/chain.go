@@ -3,29 +3,33 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	authz "github.com/cosmos/cosmos-sdk/x/authz"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	govv1types "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
+	upgradetypes "github.com/cosmos/cosmos-sdk/x/upgrade/types"
+
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/kava-labs/kava/app"
 	kavaparams "github.com/kava-labs/kava/app/params"
 	"github.com/kava-labs/kava/tests/e2e/runner"
 	"github.com/kava-labs/kava/tests/util"
-	cdptypes "github.com/kava-labs/kava/x/cdp/types"
 	committeetypes "github.com/kava-labs/kava/x/committee/types"
 	communitytypes "github.com/kava-labs/kava/x/community/types"
 	earntypes "github.com/kava-labs/kava/x/earn/types"
+	evmutiltypes "github.com/kava-labs/kava/x/evmutil/types"
 )
 
 // Chain wraps query clients & accounts for a network
@@ -42,16 +46,15 @@ type Chain struct {
 	EncodingConfig kavaparams.EncodingConfig
 
 	Auth      authtypes.QueryClient
-	Authz     authz.QueryClient
 	Bank      banktypes.QueryClient
 	Committee committeetypes.QueryClient
 	Community communitytypes.QueryClient
 	Earn      earntypes.QueryClient
 	Evm       evmtypes.QueryClient
-	Gov       govv1types.QueryClient
-	Cdp       cdptypes.QueryClient
+	Evmutil   evmutiltypes.QueryClient
 	Tm        tmservice.ServiceClient
 	Tx        txtypes.ServiceClient
+	Upgrade   upgradetypes.QueryClient
 }
 
 // NewChain creates the query clients & signing account management for a chain run on a set of ports.
@@ -79,16 +82,15 @@ func NewChain(t *testing.T, details *runner.ChainDetails, fundedAccountMnemonic 
 	}
 
 	chain.Auth = authtypes.NewQueryClient(grpcConn)
-	chain.Authz = authz.NewQueryClient(grpcConn)
 	chain.Bank = banktypes.NewQueryClient(grpcConn)
 	chain.Committee = committeetypes.NewQueryClient(grpcConn)
 	chain.Community = communitytypes.NewQueryClient(grpcConn)
 	chain.Earn = earntypes.NewQueryClient(grpcConn)
 	chain.Evm = evmtypes.NewQueryClient(grpcConn)
-	chain.Gov = govv1types.NewQueryClient(grpcConn)
-	chain.Cdp = cdptypes.NewQueryClient(grpcConn)
+	chain.Evmutil = evmutiltypes.NewQueryClient(grpcConn)
 	chain.Tm = tmservice.NewServiceClient(grpcConn)
 	chain.Tx = txtypes.NewServiceClient(grpcConn)
+	chain.Upgrade = upgradetypes.NewQueryClient(grpcConn)
 
 	// initialize accounts map
 	chain.accounts = make(map[string]*SigningAccount)
@@ -101,7 +103,7 @@ func NewChain(t *testing.T, details *runner.ChainDetails, fundedAccountMnemonic 
 	)
 
 	// check that funded account is actually funded.
-	fmt.Printf("account used for funding (%s) address: %s\n", FundedAccountName, whale.SdkAddress)
+	fmt.Printf("[%s] account used for funding (%s) address: %s\n", chain.ChainId, FundedAccountName, whale.SdkAddress)
 	whaleFunds := chain.QuerySdkForBalances(whale.SdkAddress)
 	if whaleFunds.IsZero() {
 		chain.t.Fatal("funded account mnemonic is for account with no funds")
@@ -127,14 +129,18 @@ func (chain *Chain) QuerySdkForBalances(addr sdk.AccAddress) sdk.Coins {
 	return res.Balances
 }
 
-func (chain *Chain) QuerySdkForModuleAccount(moduleName string) authtypes.AccountI {
-	res, err := chain.Auth.ModuleAccountByName(
-		context.Background(),
-		&authtypes.QueryModuleAccountByNameRequest{Name: moduleName},
-	)
+// GetModuleBalances returns the balance of a requested module account
+func (chain *Chain) GetModuleBalances(moduleName string) sdk.Coins {
+	addr := authtypes.NewModuleAddress(moduleName)
+	return chain.QuerySdkForBalances(addr)
+}
+
+func (chain *Chain) GetErc20Balance(contract, address common.Address) *big.Int {
+	resData, err := chain.EvmClient.CallContract(context.Background(), ethereum.CallMsg{
+		To:   &contract,
+		Data: util.BuildErc20BalanceOfCallData(address),
+	}, nil)
 	require.NoError(chain.t, err)
-	var account authtypes.AccountI
-	err = chain.EncodingConfig.InterfaceRegistry.UnpackAny(res.Account, &account)
-	require.NoError(chain.t, err)
-	return account
+
+	return new(big.Int).SetBytes(resData)
 }

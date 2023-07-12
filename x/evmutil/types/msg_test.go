@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/kava-labs/kava/app"
+	"github.com/kava-labs/kava/x/evmutil/testutil"
 	"github.com/kava-labs/kava/x/evmutil/types"
 	"github.com/stretchr/testify/require"
 
@@ -197,4 +198,227 @@ func TestMsgConvertERC20ToCoin(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConvertCosmosCoinToERC20_ValidateBasic(t *testing.T) {
+	validKavaAddr := app.RandomAddress()
+	validHexAddr, _ := testutil.RandomEvmAccount()
+	invalidAddr := "not-an-address"
+	validAmount := sdk.NewInt64Coin("hard", 5e3)
+
+	testCases := []struct {
+		name        string
+		initiator   string
+		receiver    string
+		amount      sdk.Coin
+		expectedErr string
+	}{
+		{
+			name:        "valid",
+			initiator:   validKavaAddr.String(),
+			receiver:    validHexAddr.String(),
+			amount:      validAmount,
+			expectedErr: "",
+		},
+		{
+			name:        "invalid - sending to kava addr",
+			initiator:   validKavaAddr.String(),
+			receiver:    app.RandomAddress().String(),
+			amount:      validAmount,
+			expectedErr: "receiver is not a valid hex address",
+		},
+		{
+			name:        "invalid - invalid initiator",
+			initiator:   invalidAddr,
+			receiver:    app.RandomAddress().String(),
+			amount:      validAmount,
+			expectedErr: "invalid initiator address",
+		},
+		{
+			name:        "invalid - invalid receiver",
+			initiator:   validKavaAddr.String(),
+			receiver:    invalidAddr,
+			amount:      validAmount,
+			expectedErr: "receiver is not a valid hex address",
+		},
+		{
+			name:        "invalid - invalid amount - nil",
+			initiator:   validKavaAddr.String(),
+			receiver:    validHexAddr.String(),
+			amount:      sdk.Coin{},
+			expectedErr: "invalid coins",
+		},
+		{
+			name:        "invalid - invalid amount - zero",
+			initiator:   validKavaAddr.String(),
+			receiver:    validHexAddr.String(),
+			amount:      sdk.NewInt64Coin("magic", 0),
+			expectedErr: "invalid coins",
+		},
+		{
+			name:        "invalid - invalid amount - negative",
+			initiator:   validKavaAddr.String(),
+			receiver:    validHexAddr.String(),
+			amount:      sdk.Coin{Denom: "magic", Amount: sdkmath.NewInt(-42)},
+			expectedErr: "invalid coins",
+		},
+		{
+			name:        "invalid - invalid amount - invalid denom",
+			initiator:   validKavaAddr.String(),
+			receiver:    validHexAddr.String(),
+			amount:      sdk.Coin{Denom: "", Amount: sdkmath.NewInt(42)},
+			expectedErr: "invalid coins",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			msg := types.NewMsgConvertCosmosCoinToERC20(
+				tc.initiator,
+				tc.receiver,
+				tc.amount,
+			)
+			err := msg.ValidateBasic()
+
+			if tc.expectedErr != "" {
+				require.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, "evmutil", msg.Route())
+				require.Equal(t, "evmutil_convert_cosmos_coin_to_erc20", msg.Type())
+				require.NotPanics(t, func() { _ = msg.GetSignBytes() })
+			}
+		})
+	}
+}
+
+func TestConvertCosmosCoinToERC20_GetSigners(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		initiator := app.RandomAddress()
+		signers := types.MsgConvertCosmosCoinToERC20{
+			Initiator: initiator.String(),
+		}.GetSigners()
+		require.Len(t, signers, 1)
+		require.Equal(t, initiator, signers[0])
+	})
+
+	t.Run("panics when depositor is invalid", func(t *testing.T) {
+		require.Panics(t, func() {
+			types.MsgConvertCosmosCoinToERC20{
+				Initiator: "not-an-address",
+			}.GetSigners()
+		})
+	})
+}
+
+func TestConvertCosmosCoinFromERC20_ValidateBasic(t *testing.T) {
+	validHexAddr := testutil.RandomEvmAddress()
+	validKavaAddr := app.RandomAddress()
+	invalidAddr := "not-an-address"
+	validAmount := sdk.NewInt64Coin("hard", 5e3)
+
+	testCases := []struct {
+		name        string
+		initiator   string
+		receiver    string
+		amount      sdk.Coin
+		expectedErr string
+	}{
+		{
+			name:        "valid",
+			initiator:   validHexAddr.String(),
+			receiver:    validKavaAddr.String(),
+			amount:      validAmount,
+			expectedErr: "",
+		},
+		{
+			name:        "invalid - sending to 0x addr",
+			initiator:   validHexAddr.String(),
+			receiver:    testutil.RandomEvmAddress().Hex(),
+			amount:      validAmount,
+			expectedErr: "invalid receiver address",
+		},
+		{
+			name:        "invalid - invalid initiator",
+			initiator:   invalidAddr,
+			receiver:    app.RandomAddress().String(),
+			amount:      validAmount,
+			expectedErr: "initiator is not a valid hex address",
+		},
+		{
+			name:        "invalid - invalid receiver",
+			initiator:   validHexAddr.String(),
+			receiver:    invalidAddr,
+			amount:      validAmount,
+			expectedErr: "invalid receiver address",
+		},
+		{
+			name:        "invalid - invalid amount - nil",
+			initiator:   validHexAddr.String(),
+			receiver:    validKavaAddr.String(),
+			amount:      sdk.Coin{},
+			expectedErr: "invalid coins",
+		},
+		{
+			name:        "invalid - invalid amount - zero",
+			initiator:   validHexAddr.String(),
+			receiver:    validKavaAddr.String(),
+			amount:      sdk.NewInt64Coin("magic", 0),
+			expectedErr: "invalid coins",
+		},
+		{
+			name:        "invalid - invalid amount - negative",
+			initiator:   validHexAddr.String(),
+			receiver:    validKavaAddr.String(),
+			amount:      sdk.Coin{Denom: "magic", Amount: sdkmath.NewInt(-42)},
+			expectedErr: "invalid coins",
+		},
+		{
+			name:        "invalid - invalid amount - invalid denom",
+			initiator:   validHexAddr.String(),
+			receiver:    validKavaAddr.String(),
+			amount:      sdk.Coin{Denom: "", Amount: sdkmath.NewInt(42)},
+			expectedErr: "invalid coins",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			msg := types.NewMsgConvertCosmosCoinFromERC20(
+				tc.initiator,
+				tc.receiver,
+				tc.amount,
+			)
+			err := msg.ValidateBasic()
+
+			if tc.expectedErr != "" {
+				require.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, "evmutil", msg.Route())
+				require.Equal(t, "evmutil_convert_cosmos_coin_from_erc20", msg.Type())
+				require.NotPanics(t, func() { _ = msg.GetSignBytes() })
+			}
+		})
+	}
+}
+
+func TestConvertCosmosCoinFromERC20_GetSigners(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		initiator0x := testutil.RandomEvmAddress()
+		initiator := sdk.AccAddress(initiator0x.Bytes())
+		signers := types.MsgConvertCosmosCoinFromERC20{
+			Initiator: initiator0x.Hex(),
+		}.GetSigners()
+		require.Len(t, signers, 1)
+		require.Equal(t, initiator, signers[0])
+	})
+
+	t.Run("panics when depositor is invalid", func(t *testing.T) {
+		require.Panics(t, func() {
+			types.MsgConvertCosmosCoinFromERC20{
+				Initiator: "not-an-address",
+			}.GetSigners()
+		})
+	})
 }

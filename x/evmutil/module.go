@@ -21,7 +21,7 @@ import (
 )
 
 // ConsensusVersion defines the current module consensus version.
-const ConsensusVersion = 1
+const ConsensusVersion = 2
 
 var (
 	_ module.AppModule      = AppModule{}
@@ -45,7 +45,9 @@ func (AppModuleBasic) Name() string {
 }
 
 // Registers legacy amino codec
-func (AppModuleBasic) RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {}
+func (AppModuleBasic) RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
+	types.RegisterLegacyAminoCodec(cdc)
+}
 
 // RegisterInterfaces registers the module's interface types
 func (a AppModuleBasic) RegisterInterfaces(reg cdctypes.InterfaceRegistry) {
@@ -127,6 +129,9 @@ func (am AppModule) LegacyQuerierHandler(legacyQuerierCdc *codec.LegacyAmino) sd
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), keeper.NewMsgServerImpl(am.keeper))
 	types.RegisterQueryServer(cfg.QueryServer(), keeper.NewQueryServerImpl(am.keeper))
+
+	m := keeper.NewMigrator(am.keeper)
+	cfg.RegisterMigration(types.ModuleName, 1, m.Migrate1to2)
 }
 
 // RegisterInvariants registers evmutil module's invariants.

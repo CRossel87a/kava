@@ -5,8 +5,11 @@ const (
 	AttributeValueCategory = ModuleName
 
 	// Event Types
-	EventTypeConvertERC20ToCoin = "convert_erc20_to_coin"
-	EventTypeConvertCoinToERC20 = "convert_coin_to_erc20"
+	EventTypeConvertERC20ToCoin = "convert_evm_erc20_to_coin"
+	EventTypeConvertCoinToERC20 = "convert_evm_erc20_from_coin"
+
+	EventTypeConvertCosmosCoinToERC20   = "convert_cosmos_coin_to_erc20"
+	EventTypeConvertCosmosCoinFromERC20 = "convert_cosmos_coin_from_erc20"
 
 	// Event Attributes - Common
 	AttributeKeyReceiver = "receiver"

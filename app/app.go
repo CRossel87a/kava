@@ -520,8 +520,7 @@ func NewApp(
 
 	evmBankKeeper := evmutilkeeper.NewEvmBankKeeper(app.evmutilKeeper, app.bankKeeper, app.accountKeeper)
 	app.evmKeeper = evmkeeper.NewKeeper(
-		appCodec,
-		keys[evmtypes.StoreKey], tkeys[evmtypes.TransientKey],
+		appCodec, keys[evmtypes.StoreKey], tkeys[evmtypes.TransientKey],
 		// Authority
 		authtypes.NewModuleAddress(govtypes.ModuleName),
 		app.accountKeeper, evmBankKeeper, app.stakingKeeper, app.feeMarketKeeper,
@@ -1139,6 +1138,7 @@ func (app *App) loadBlockedMaccAddrs() map[string]bool {
 		app.accountKeeper.GetModuleAddress(kavadisttypes.FundModuleAccount).String(): true,
 		// community
 		app.accountKeeper.GetModuleAddress(communitytypes.ModuleAccountName).String(): true,
+		// NOTE: if adding evmutil, adjust the cosmos-coins-fully-backed-invariant accordingly.
 	}
 
 	for addr := range modAccAddrs {

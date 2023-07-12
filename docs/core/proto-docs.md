@@ -247,6 +247,7 @@
     - [Msg](#kava.earn.v1beta1.Msg)
   
 - [kava/evmutil/v1beta1/conversion_pair.proto](#kava/evmutil/v1beta1/conversion_pair.proto)
+    - [AllowedCosmosCoinERC20Token](#kava.evmutil.v1beta1.AllowedCosmosCoinERC20Token)
     - [ConversionPair](#kava.evmutil.v1beta1.ConversionPair)
   
 - [kava/evmutil/v1beta1/genesis.proto](#kava/evmutil/v1beta1/genesis.proto)
@@ -255,6 +256,9 @@
     - [Params](#kava.evmutil.v1beta1.Params)
   
 - [kava/evmutil/v1beta1/query.proto](#kava/evmutil/v1beta1/query.proto)
+    - [DeployedCosmosCoinContract](#kava.evmutil.v1beta1.DeployedCosmosCoinContract)
+    - [QueryDeployedCosmosCoinContractsRequest](#kava.evmutil.v1beta1.QueryDeployedCosmosCoinContractsRequest)
+    - [QueryDeployedCosmosCoinContractsResponse](#kava.evmutil.v1beta1.QueryDeployedCosmosCoinContractsResponse)
     - [QueryParamsRequest](#kava.evmutil.v1beta1.QueryParamsRequest)
     - [QueryParamsResponse](#kava.evmutil.v1beta1.QueryParamsResponse)
   
@@ -263,6 +267,10 @@
 - [kava/evmutil/v1beta1/tx.proto](#kava/evmutil/v1beta1/tx.proto)
     - [MsgConvertCoinToERC20](#kava.evmutil.v1beta1.MsgConvertCoinToERC20)
     - [MsgConvertCoinToERC20Response](#kava.evmutil.v1beta1.MsgConvertCoinToERC20Response)
+    - [MsgConvertCosmosCoinFromERC20](#kava.evmutil.v1beta1.MsgConvertCosmosCoinFromERC20)
+    - [MsgConvertCosmosCoinFromERC20Response](#kava.evmutil.v1beta1.MsgConvertCosmosCoinFromERC20Response)
+    - [MsgConvertCosmosCoinToERC20](#kava.evmutil.v1beta1.MsgConvertCosmosCoinToERC20)
+    - [MsgConvertCosmosCoinToERC20Response](#kava.evmutil.v1beta1.MsgConvertCosmosCoinToERC20Response)
     - [MsgConvertERC20ToCoin](#kava.evmutil.v1beta1.MsgConvertERC20ToCoin)
     - [MsgConvertERC20ToCoinResponse](#kava.evmutil.v1beta1.MsgConvertERC20ToCoinResponse)
   
@@ -3658,6 +3666,27 @@ Msg defines the earn Msg service.
 
 
 
+<a name="kava.evmutil.v1beta1.AllowedCosmosCoinERC20Token"></a>
+
+### AllowedCosmosCoinERC20Token
+AllowedCosmosCoinERC20Token defines allowed cosmos-sdk denom & metadata
+for evm token representations of sdk assets.
+NOTE: once evm token contracts are deployed, changes to metadata for a given
+cosmos_denom will not change metadata of deployed contract.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `cosmos_denom` | [string](#string) |  | Denom of the sdk.Coin |
+| `name` | [string](#string) |  | Name of ERC20 contract |
+| `symbol` | [string](#string) |  | Symbol of ERC20 contract |
+| `decimals` | [uint32](#uint32) |  | Number of decimals ERC20 contract is deployed with. |
+
+
+
+
+
+
 <a name="kava.evmutil.v1beta1.ConversionPair"></a>
 
 ### ConversionPair
@@ -3732,6 +3761,7 @@ Params defines the evmutil module params
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | `enabled_conversion_pairs` | [ConversionPair](#kava.evmutil.v1beta1.ConversionPair) | repeated | enabled_conversion_pairs defines the list of conversion pairs allowed to be converted between Kava ERC20 and sdk.Coin |
+| `allowed_cosmos_denoms` | [AllowedCosmosCoinERC20Token](#kava.evmutil.v1beta1.AllowedCosmosCoinERC20Token) | repeated | allowed_cosmos_denoms is a list of denom & erc20 token metadata pairs. if a denom is in the list, it is allowed to be converted to an erc20 in the evm. |
 
 
 
@@ -3751,6 +3781,54 @@ Params defines the evmutil module params
 <p align="right"><a href="#top">Top</a></p>
 
 ## kava/evmutil/v1beta1/query.proto
+
+
+
+<a name="kava.evmutil.v1beta1.DeployedCosmosCoinContract"></a>
+
+### DeployedCosmosCoinContract
+DeployedCosmosCoinContract defines a deployed token contract to the evm representing a native cosmos-sdk coin
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `cosmos_denom` | [string](#string) |  |  |
+| `address` | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="kava.evmutil.v1beta1.QueryDeployedCosmosCoinContractsRequest"></a>
+
+### QueryDeployedCosmosCoinContractsRequest
+QueryDeployedCosmosCoinContractsRequest defines the request type for Query/DeployedCosmosCoinContracts method.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `cosmos_denoms` | [string](#string) | repeated | optional query param to only return specific denoms in the list denoms that do not have deployed contracts will be omitted from the result must request fewer than 100 denoms at a time. |
+| `pagination` | [cosmos.base.query.v1beta1.PageRequest](#cosmos.base.query.v1beta1.PageRequest) |  | pagination defines an optional pagination for the request. |
+
+
+
+
+
+
+<a name="kava.evmutil.v1beta1.QueryDeployedCosmosCoinContractsResponse"></a>
+
+### QueryDeployedCosmosCoinContractsResponse
+QueryDeployedCosmosCoinContractsResponse defines the response type for the Query/DeployedCosmosCoinContracts method.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `deployed_cosmos_coin_contracts` | [DeployedCosmosCoinContract](#kava.evmutil.v1beta1.DeployedCosmosCoinContract) | repeated | deployed_cosmos_coin_contracts is a list of cosmos-sdk coin denom and its deployed contract address |
+| `pagination` | [cosmos.base.query.v1beta1.PageResponse](#cosmos.base.query.v1beta1.PageResponse) |  | pagination defines the pagination in the response. |
+
+
+
 
 
 
@@ -3793,6 +3871,7 @@ Query defines the gRPC querier service for evmutil module
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
 | `Params` | [QueryParamsRequest](#kava.evmutil.v1beta1.QueryParamsRequest) | [QueryParamsResponse](#kava.evmutil.v1beta1.QueryParamsResponse) | Params queries all parameters of the evmutil module. | GET|/kava/evmutil/v1beta1/params|
+| `DeployedCosmosCoinContracts` | [QueryDeployedCosmosCoinContractsRequest](#kava.evmutil.v1beta1.QueryDeployedCosmosCoinContractsRequest) | [QueryDeployedCosmosCoinContractsResponse](#kava.evmutil.v1beta1.QueryDeployedCosmosCoinContractsResponse) | DeployedCosmosCoinContracts queries a list cosmos coin denom and their deployed erc20 address | GET|/kava/evmutil/v1beta1/deployed_cosmos_coin_contracts|
 
  <!-- end services -->
 
@@ -3808,7 +3887,7 @@ Query defines the gRPC querier service for evmutil module
 <a name="kava.evmutil.v1beta1.MsgConvertCoinToERC20"></a>
 
 ### MsgConvertCoinToERC20
-MsgConvertCoinToERC20 defines a conversion from sdk.Coin to Kava ERC20.
+MsgConvertCoinToERC20 defines a conversion from sdk.Coin to Kava ERC20 for EVM-native assets.
 
 
 | Field | Type | Label | Description |
@@ -3832,10 +3911,64 @@ MsgConvertCoinToERC20Response defines the response value from Msg/ConvertCoinToE
 
 
 
+<a name="kava.evmutil.v1beta1.MsgConvertCosmosCoinFromERC20"></a>
+
+### MsgConvertCosmosCoinFromERC20
+MsgConvertCosmosCoinFromERC20 defines a conversion from ERC20 to cosmos coins for cosmos-native assets.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `initiator` | [string](#string) |  | EVM hex address initiating the conversion. |
+| `receiver` | [string](#string) |  | Kava bech32 address that will receive the cosmos coins. |
+| `amount` | [cosmos.base.v1beta1.Coin](#cosmos.base.v1beta1.Coin) |  | Amount is the amount to convert, expressed as a Cosmos coin. |
+
+
+
+
+
+
+<a name="kava.evmutil.v1beta1.MsgConvertCosmosCoinFromERC20Response"></a>
+
+### MsgConvertCosmosCoinFromERC20Response
+MsgConvertCosmosCoinFromERC20Response defines the response value from Msg/MsgConvertCosmosCoinFromERC20.
+
+
+
+
+
+
+<a name="kava.evmutil.v1beta1.MsgConvertCosmosCoinToERC20"></a>
+
+### MsgConvertCosmosCoinToERC20
+MsgConvertCosmosCoinToERC20 defines a conversion from cosmos sdk.Coin to ERC20 for cosmos-native assets.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `initiator` | [string](#string) |  | Kava bech32 address initiating the conversion. |
+| `receiver` | [string](#string) |  | EVM hex address that will receive the ERC20 tokens. |
+| `amount` | [cosmos.base.v1beta1.Coin](#cosmos.base.v1beta1.Coin) |  | Amount is the sdk.Coin amount to convert. |
+
+
+
+
+
+
+<a name="kava.evmutil.v1beta1.MsgConvertCosmosCoinToERC20Response"></a>
+
+### MsgConvertCosmosCoinToERC20Response
+MsgConvertCosmosCoinToERC20Response defines the response value from Msg/MsgConvertCosmosCoinToERC20.
+
+
+
+
+
+
 <a name="kava.evmutil.v1beta1.MsgConvertERC20ToCoin"></a>
 
 ### MsgConvertERC20ToCoin
-MsgConvertERC20ToCoin defines a conversion from Kava ERC20 to sdk.Coin.
+MsgConvertERC20ToCoin defines a conversion from Kava ERC20 to sdk.Coin for EVM-native assets.
 
 
 | Field | Type | Label | Description |
@@ -3876,6 +4009,8 @@ Msg defines the evmutil Msg service.
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
 | `ConvertCoinToERC20` | [MsgConvertCoinToERC20](#kava.evmutil.v1beta1.MsgConvertCoinToERC20) | [MsgConvertCoinToERC20Response](#kava.evmutil.v1beta1.MsgConvertCoinToERC20Response) | ConvertCoinToERC20 defines a method for converting sdk.Coin to Kava ERC20. | |
 | `ConvertERC20ToCoin` | [MsgConvertERC20ToCoin](#kava.evmutil.v1beta1.MsgConvertERC20ToCoin) | [MsgConvertERC20ToCoinResponse](#kava.evmutil.v1beta1.MsgConvertERC20ToCoinResponse) | ConvertERC20ToCoin defines a method for converting Kava ERC20 to sdk.Coin. | |
+| `ConvertCosmosCoinToERC20` | [MsgConvertCosmosCoinToERC20](#kava.evmutil.v1beta1.MsgConvertCosmosCoinToERC20) | [MsgConvertCosmosCoinToERC20Response](#kava.evmutil.v1beta1.MsgConvertCosmosCoinToERC20Response) | ConvertCosmosCoinToERC20 defines a method for converting a cosmos sdk.Coin to an ERC20. | |
+| `ConvertCosmosCoinFromERC20` | [MsgConvertCosmosCoinFromERC20](#kava.evmutil.v1beta1.MsgConvertCosmosCoinFromERC20) | [MsgConvertCosmosCoinFromERC20Response](#kava.evmutil.v1beta1.MsgConvertCosmosCoinFromERC20Response) | ConvertCosmosCoinFromERC20 defines a method for converting a cosmos sdk.Coin to an ERC20. | |
 
  <!-- end services -->
 
