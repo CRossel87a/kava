@@ -542,6 +542,10 @@
               "amount": "1000000000"
             },
             {
+              "denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
+              "amount": "10000000000"
+            },
+            {
               "denom": "swp",
               "amount": "5000000000"
             },
@@ -816,54 +820,37 @@
         "circuit_breaker": false,
         "collateral_params": [
           {
-            "auction_size": "50000000000",
-            "conversion_factor": "8",
-            "debt_limit": {
-              "amount": "20000000000000",
-              "denom": "usdx"
-            },
             "denom": "bnb",
-            "liquidation_market_id": "bnb:usd:30",
-            "liquidation_penalty": "0.050000000000000000",
-            "liquidation_ratio": "1.500000000000000000",
-            "keeper_reward_percentage": "0.01",
-            "check_collateralization_index_count": "10",
-            "spot_market_id": "bnb:usd",
-            "stability_fee": "1.000000000782997700",
-            "type": "bnb-a"
-          },
-          {
-            "auction_size": "100000000",
-            "conversion_factor": "8",
-            "debt_limit": {
-              "amount": "2000000000000",
-              "denom": "usdx"
-            },
-            "denom": "btcb",
-            "liquidation_market_id": "btc:usd:30",
-            "liquidation_penalty": "0.050000000000000000",
-            "liquidation_ratio": "1.500000000000000000",
-            "keeper_reward_percentage": "0.01",
-            "check_collateralization_index_count": "10",
-            "spot_market_id": "btc:usd",
-            "stability_fee": "1.000000000782997700",
-            "type": "btcb-a"
-          },
-          {
-            "denom": "xrpb",
-            "type": "xrpb-a",
+            "type": "bnb-a",
             "liquidation_ratio": "1.500000000000000000",
             "debt_limit": {
               "denom": "usdx",
-              "amount": "1000000000000"
+              "amount": "5000000000000"
             },
-            "stability_fee": "1.000000001547125958",
-            "auction_size": "100000000000",
-            "liquidation_penalty": "0.075000000000000000",
-            "keeper_reward_percentage": "0.01",
+            "stability_fee": "1.000000000158153904",
+            "auction_size": "50000000000",
+            "liquidation_penalty": "0.025000000000000000",
+            "spot_market_id": "bnb:usd",
+            "liquidation_market_id": "bnb:usd:30",
+            "keeper_reward_percentage": "0.010000000000000000",
             "check_collateralization_index_count": "10",
-            "spot_market_id": "xrp:usd",
-            "liquidation_market_id": "xrp:usd:30",
+            "conversion_factor": "8"
+          },
+          {
+            "denom": "btcb",
+            "type": "btcb-a",
+            "liquidation_ratio": "1.500000000000000000",
+            "debt_limit": {
+              "denom": "usdx",
+              "amount": "10000000000000"
+            },
+            "stability_fee": "1.000000000782997609",
+            "auction_size": "100000000",
+            "liquidation_penalty": "0.025000000000000000",
+            "spot_market_id": "btc:usd",
+            "liquidation_market_id": "btc:usd:30",
+            "keeper_reward_percentage": "0.010000000000000000",
+            "check_collateralization_index_count": "10",
             "conversion_factor": "8"
           },
           {
@@ -872,15 +859,15 @@
             "liquidation_ratio": "1.010000000000000000",
             "debt_limit": {
               "denom": "usdx",
-              "amount": "3000000000000"
+              "amount": "50000000000000"
             },
             "stability_fee": "1.000000000000000000",
             "auction_size": "1000000000000",
-            "liquidation_penalty": "0.075000000000000000",
-            "check_collateralization_index_count": "10",
-            "keeper_reward_percentage": "0.01",
+            "liquidation_penalty": "0.025000000000000000",
             "spot_market_id": "busd:usd",
             "liquidation_market_id": "busd:usd:30",
+            "keeper_reward_percentage": "0.010000000000000000",
+            "check_collateralization_index_count": "10",
             "conversion_factor": "8"
           },
           {
@@ -889,135 +876,67 @@
             "liquidation_ratio": "1.100000000000000000",
             "debt_limit": {
               "denom": "usdx",
-              "amount": "3000000000000"
+              "amount": "1000000000000"
             },
             "stability_fee": "1.000000012857214317",
             "auction_size": "1000000000000",
-            "liquidation_penalty": "0.075000000000000000",
-            "check_collateralization_index_count": "10",
-            "keeper_reward_percentage": "0.01",
+            "liquidation_penalty": "0.025000000000000000",
             "spot_market_id": "busd:usd",
             "liquidation_market_id": "busd:usd:30",
+            "keeper_reward_percentage": "0.010000000000000000",
+            "check_collateralization_index_count": "10",
             "conversion_factor": "8"
           },
           {
-            "auction_size": "50000000000",
-            "conversion_factor": "6",
+            "denom": "xrpb",
+            "type": "xrpb-a",
+            "liquidation_ratio": "1.500000000000000000",
             "debt_limit": {
-              "amount": "2000000000000",
-              "denom": "usdx"
+              "denom": "usdx",
+              "amount": "5000000000000"
             },
+            "stability_fee": "1.000000000782997609",
+            "auction_size": "4000000000000",
+            "liquidation_penalty": "0.025000000000000000",
+            "spot_market_id": "xrp:usd",
+            "liquidation_market_id": "xrp:usd:30",
+            "keeper_reward_percentage": "0.010000000000000000",
+            "check_collateralization_index_count": "10",
+            "conversion_factor": "8"
+          },
+          {
             "denom": "ukava",
-            "liquidation_market_id": "kava:usd:30",
-            "liquidation_penalty": "0.050000000000000000",
+            "type": "ukava-a",
             "liquidation_ratio": "1.500000000000000000",
-            "keeper_reward_percentage": "0.01",
-            "check_collateralization_index_count": "10",
+            "debt_limit": {
+              "denom": "usdx",
+              "amount": "250000000000"
+            },
+            "stability_fee": "1.000000000782997609",
+            "auction_size": "5000000000",
+            "liquidation_penalty": "0.025000000000000000",
             "spot_market_id": "kava:usd",
-            "stability_fee": "1.000000000782997700",
-            "type": "ukava-a"
-          },
-          {
-            "auction_size": "50000000000",
-            "conversion_factor": "6",
-            "debt_limit": {
-              "amount": "2000000000000",
-              "denom": "usdx"
-            },
-            "denom": "ibc/C72DE26FFF16DE62BE2784E12229BDF5F4465CE8B10530426D6DB53255FF01B2",
-            "liquidation_market_id": "luna:usd:30",
-            "spot_market_id": "luna:usd",
-            "liquidation_penalty": "0.050000000000000000",
-            "liquidation_ratio": "1.500000000000000000",
-            "keeper_reward_percentage": "0.01",
+            "liquidation_market_id": "kava:usd:30",
+            "keeper_reward_percentage": "0.010000000000000000",
             "check_collateralization_index_count": "10",
-            "stability_fee": "1.000000000782997700",
-            "type": "luna-a"
+            "conversion_factor": "6"
           },
           {
-            "auction_size": "50000000000",
-            "conversion_factor": "6",
-            "debt_limit": {
-              "amount": "2000000000000",
-              "denom": "usdx"
-            },
-            "denom": "ibc/4129EB76C01ED14052054BB975DE0C6C5010E12FFD9253C20C58BCD828BEE9A5",
-            "liquidation_market_id": "akt:usd:30",
-            "spot_market_id": "akt:usd",
-            "liquidation_penalty": "0.050000000000000000",
-            "liquidation_ratio": "1.500000000000000000",
-            "keeper_reward_percentage": "0.01",
-            "check_collateralization_index_count": "10",
-            "stability_fee": "1.000000000782997700",
-            "type": "akt-a"
-          },
-          {
-            "auction_size": "50000000000",
-            "conversion_factor": "6",
-            "debt_limit": {
-              "amount": "2000000000000",
-              "denom": "usdx"
-            },
-            "denom": "ibc/ED07A3391A112B175915CD8FAF43A2DA8E4790EDE12566649D0C2F97716B8518",
-            "liquidation_market_id": "osmo:usd:30",
-            "spot_market_id": "osmo:usd",
-            "liquidation_penalty": "0.050000000000000000",
-            "liquidation_ratio": "1.500000000000000000",
-            "keeper_reward_percentage": "0.01",
-            "check_collateralization_index_count": "10",
-            "stability_fee": "1.000000000782997700",
-            "type": "osmo-a"
-          },
-          {
-            "auction_size": "50000000000",
-            "conversion_factor": "6",
-            "debt_limit": {
-              "amount": "2000000000000",
-              "denom": "usdx"
-            },
-            "denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
-            "liquidation_market_id": "atom:usd:30",
-            "spot_market_id": "atom:usd",
-            "liquidation_penalty": "0.050000000000000000",
-            "liquidation_ratio": "1.500000000000000000",
-            "keeper_reward_percentage": "0.01",
-            "check_collateralization_index_count": "10",
-            "stability_fee": "1.000000000782997700",
-            "type": "atom-a"
-          },
-          {
-            "auction_size": "50000000000",
-            "conversion_factor": "6",
-            "debt_limit": {
-              "amount": "2000000000000",
-              "denom": "usdx"
-            },
             "denom": "hard",
-            "liquidation_market_id": "hard:usd:30",
-            "liquidation_penalty": "0.050000000000000000",
+            "type": "hard-a",
             "liquidation_ratio": "1.500000000000000000",
-            "keeper_reward_percentage": "0.01",
-            "check_collateralization_index_count": "10",
-            "spot_market_id": "hard:usd",
-            "stability_fee": "1.000000000782997700",
-            "type": "hard-a"
-          },
-          {
-            "auction_size": "50000000000",
-            "conversion_factor": "6",
             "debt_limit": {
-              "amount": "2000000000000",
-              "denom": "usdx"
+              "denom": "usdx",
+              "amount": "100000000000"
             },
-            "denom": "swp",
-            "liquidation_market_id": "swp:usd:30",
-            "liquidation_penalty": "0.050000000000000000",
-            "liquidation_ratio": "1.500000000000000000",
-            "keeper_reward_percentage": "0.01",
+            "stability_fee": "1.000000000782997609",
+            "auction_size": "5000000000",
+            "liquidation_penalty": "0.025000000000000000",
+            "spot_market_id": "hard:usd",
+            "liquidation_market_id": "hard:usd:30",
+            "keeper_reward_percentage": "0.010000000000000000",
             "check_collateralization_index_count": "10",
-            "spot_market_id": "swp:usd",
-            "stability_fee": "1.000000000782997700",
-            "type": "swp-a"
+            "conversion_factor": "6"
           },
           {
             "denom": "hbtc",
@@ -1028,15 +947,50 @@
               "amount": "10000000000000"
             },
             "stability_fee": "1.000000001547125958",
-            "auction_size": "1000000000000",
-            "liquidation_penalty": "0.075000000000000000",
-            "check_collateralization_index_count": "10",
-            "keeper_reward_percentage": "0.01",
+            "auction_size": "100000000",
+            "liquidation_penalty": "0.025000000000000000",
             "spot_market_id": "btc:usd",
             "liquidation_market_id": "btc:usd:30",
+            "keeper_reward_percentage": "0.010000000000000000",
+            "check_collateralization_index_count": "10",
             "conversion_factor": "8"
+          },
+          {
+            "denom": "swp",
+            "type": "swp-a",
+            "liquidation_ratio": "1.500000000000000000",
+            "debt_limit": {
+              "denom": "usdx",
+              "amount": "10000000"
+            },
+            "stability_fee": "1.000000001547125958",
+            "auction_size": "50000000000",
+            "liquidation_penalty": "0.025000000000000000",
+            "spot_market_id": "swp:usd",
+            "liquidation_market_id": "swp:usd:30",
+            "keeper_reward_percentage": "0.010000000000000000",
+            "check_collateralization_index_count": "10",
+            "conversion_factor": "6"
+          },
+          {
+            "denom": "erc20/tether/usdt",
+            "type": "usdt-a",
+            "liquidation_ratio": "1.010000000000000000",
+            "debt_limit": {
+              "denom": "usdx",
+              "amount": "25000000000000"
+            },
+            "stability_fee": "1.000000000000000000",
+            "auction_size": "100000000000",
+            "liquidation_penalty": "0.025000000000000000",
+            "spot_market_id": "usdt:usd",
+            "liquidation_market_id": "usdt:usd:30",
+            "keeper_reward_percentage": "0.010000000000000000",
+            "check_collateralization_index_count": "10",
+            "conversion_factor": "6"
           }
-        ],
+        ]
+        ,
         "debt_auction_lot": "10000000000",
         "debt_auction_threshold": "100000000000",
         "debt_param": {
@@ -1046,7 +1000,7 @@
           "reference_asset": "usd"
         },
         "global_debt_limit": {
-          "amount": "53000000000000",
+          "amount": "181200010000000",
           "denom": "usdx"
         },
         "surplus_auction_lot": "10000000000",
@@ -2002,6 +1956,113 @@
               }
             ],
             "nested_types": []
+          },
+          {
+            "msg_type_url": "/kava.cdp.v1beta1.MsgCreateCDP",
+            "msg_value_type_name": "MsgValueCdpCreateCDP",
+            "value_types": [
+              {
+                "name": "sender",
+                "type": "string"
+              },
+              {
+                "name": "collateral",
+                "type": "Coin"
+              },
+              {
+                "name": "principal",
+                "type": "Coin"
+              },
+              {
+                "name": "collateral_type",
+                "type": "string"
+              }
+            ],
+            "nested_types": []
+          },
+          {
+            "msg_type_url": "/kava.cdp.v1beta1.MsgDeposit",
+            "msg_value_type_name": "MsgValueCdpDeposit",
+            "value_types": [
+              {
+                "name": "depositor",
+                "type": "string"
+              },
+              {
+                "name": "owner",
+                "type": "string"
+              },
+              {
+                "name": "collateral",
+                "type": "Coin"
+              },
+              {
+                "name": "collateral_type",
+                "type": "string"
+              }
+            ],
+            "nested_types": []
+          },
+          {
+            "msg_type_url": "/kava.cdp.v1beta1.MsgWithdraw",
+            "msg_value_type_name": "MsgValueCdpWithdraw",
+            "value_types": [
+              {
+                "name": "depositor",
+                "type": "string"
+              },
+              {
+                "name": "owner",
+                "type": "string"
+              },
+              {
+                "name": "collateral",
+                "type": "Coin"
+              },
+              {
+                "name": "collateral_type",
+                "type": "string"
+              }
+            ],
+            "nested_types": []
+          },
+          {
+            "msg_type_url": "/kava.cdp.v1beta1.MsgDrawDebt",
+            "msg_value_type_name": "MsgValueCdpDrawDebt",
+            "value_types": [
+              {
+                "name": "sender",
+                "type": "string"
+              },
+              {
+                "name": "collateral_type",
+                "type": "string"
+              },
+              {
+                "name": "principal",
+                "type": "Coin"
+              }
+            ],
+            "nested_types": []
+          },
+          {
+            "msg_type_url": "/kava.cdp.v1beta1.MsgRepayDebt",
+            "msg_value_type_name": "MsgValueCdpRepayDebt",
+            "value_types": [
+              {
+                "name": "sender",
+                "type": "string"
+              },
+              {
+                "name": "collateral_type",
+                "type": "string"
+              },
+              {
+                "name": "payment",
+                "type": "Coin"
+              }
+            ],
+            "nested_types": []
           }
         ],
         "allow_unprotected_txs": false
@@ -2018,32 +2079,7 @@
             "decimals": 6
           }
         ],
-        "enabled_conversion_pairs": [
-          {
-            "kava_erc20_address": "0xBb304f44b7EFD865361F2AD973d8ebA433893ABC",
-            "denom": "erc20/multichain/usdc"
-          },
-          {
-            "kava_erc20_address": "0xA637F4CECbA91Ad19075bA3d330cd95f694B1707",
-            "denom": "erc20/multichain/usdt"
-          },
-          {
-            "kava_erc20_address": "0x288429bc07B8d030ba418bb30F170327F9fBE502",
-            "denom": "erc20/multichain/wbtc"
-          },
-          {
-            "kava_erc20_address": "0x7a5DBf8e6ac1F6aCCF14f5B4E88b21EAA04c983d",
-            "denom": "erc20/axelar/usdc"
-          },
-          {
-            "kava_erc20_address": "0x7d2Ee2914324d5D4dC33A5c295E720659D5F3fA7",
-            "denom": "erc20/axelar/wbtc"
-          },
-          {
-            "kava_erc20_address": "0x5d6D67a665C9F169B0f9436E05B11108C1606043",
-            "denom": "erc20/axelar/eth"
-          }
-        ]
+        "enabled_conversion_pairs": []
       }
     },
     "feemarket": {
@@ -2461,6 +2497,24 @@
             },
             "reserve_factor": "0.025000000000000000",
             "keeper_reward_percentage": "0.020000000000000000"
+          },
+          {
+            "denom": "erc20/tether/usdt",
+            "borrow_limit": {
+              "has_max_limit": true,
+              "maximum_limit": "0.000000000000000000",
+              "loan_to_value": "0.000000000000000000"
+            },
+            "spot_market_id": "usdt:usd:30",
+            "conversion_factor": "1000000",
+            "interest_rate_model": {
+              "base_rate_apy": "0.000000000000000000",
+              "base_multiplier": "0.050000000000000000",
+              "kink": "0.800000000000000000",
+              "jump_multiplier": "5.000000000000000000"
+            },
+            "reserve_factor": "0.025000000000000000",
+            "keeper_reward_percentage": "0.020000000000000000"
           }
         ],
         "minimum_borrow_usd_value": "10.000000000000000000"
@@ -2658,6 +2712,18 @@
             "collateral_type": "erc20/multichain/wbtc",
             "start": "2022-11-11T15:00:00Z",
             "end": "2024-11-11T15:00:00Z",
+            "rewards_per_second": [
+              {
+                "denom": "ukava",
+                "amount": "787"
+              }
+            ]
+          },
+          {
+            "active": true,
+            "collateral_type": "erc20/tether/usdt",
+            "start": "2023-06-21T15:00:00Z",
+            "end": "2024-06-21T15:00:00Z",
             "rewards_per_second": [
               {
                 "denom": "ukava",

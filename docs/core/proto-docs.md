@@ -181,6 +181,15 @@
   
     - [Msg](#kava.committee.v1beta1.Msg)
   
+- [kava/community/v1beta1/params.proto](#kava/community/v1beta1/params.proto)
+    - [Params](#kava.community.v1beta1.Params)
+  
+- [kava/community/v1beta1/staking.proto](#kava/community/v1beta1/staking.proto)
+    - [StakingRewardsState](#kava.community.v1beta1.StakingRewardsState)
+  
+- [kava/community/v1beta1/genesis.proto](#kava/community/v1beta1/genesis.proto)
+    - [GenesisState](#kava.community.v1beta1.GenesisState)
+  
 - [kava/community/v1beta1/proposal.proto](#kava/community/v1beta1/proposal.proto)
     - [CommunityCDPRepayDebtProposal](#kava.community.v1beta1.CommunityCDPRepayDebtProposal)
     - [CommunityCDPWithdrawCollateralProposal](#kava.community.v1beta1.CommunityCDPWithdrawCollateralProposal)
@@ -188,8 +197,12 @@
     - [CommunityPoolLendWithdrawProposal](#kava.community.v1beta1.CommunityPoolLendWithdrawProposal)
   
 - [kava/community/v1beta1/query.proto](#kava/community/v1beta1/query.proto)
+    - [QueryAnnualizedRewardsRequest](#kava.community.v1beta1.QueryAnnualizedRewardsRequest)
+    - [QueryAnnualizedRewardsResponse](#kava.community.v1beta1.QueryAnnualizedRewardsResponse)
     - [QueryBalanceRequest](#kava.community.v1beta1.QueryBalanceRequest)
     - [QueryBalanceResponse](#kava.community.v1beta1.QueryBalanceResponse)
+    - [QueryParamsRequest](#kava.community.v1beta1.QueryParamsRequest)
+    - [QueryParamsResponse](#kava.community.v1beta1.QueryParamsResponse)
     - [QueryTotalBalanceRequest](#kava.community.v1beta1.QueryTotalBalanceRequest)
     - [QueryTotalBalanceResponse](#kava.community.v1beta1.QueryTotalBalanceResponse)
   
@@ -198,6 +211,8 @@
 - [kava/community/v1beta1/tx.proto](#kava/community/v1beta1/tx.proto)
     - [MsgFundCommunityPool](#kava.community.v1beta1.MsgFundCommunityPool)
     - [MsgFundCommunityPoolResponse](#kava.community.v1beta1.MsgFundCommunityPoolResponse)
+    - [MsgUpdateParams](#kava.community.v1beta1.MsgUpdateParams)
+    - [MsgUpdateParamsResponse](#kava.community.v1beta1.MsgUpdateParamsResponse)
   
     - [Msg](#kava.community.v1beta1.Msg)
   
@@ -2882,6 +2897,103 @@ Msg defines the committee Msg service
 
 
 
+<a name="kava/community/v1beta1/params.proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## kava/community/v1beta1/params.proto
+
+
+
+<a name="kava.community.v1beta1.Params"></a>
+
+### Params
+Params defines the parameters of the community module.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `upgrade_time_disable_inflation` | [google.protobuf.Timestamp](#google.protobuf.Timestamp) |  | upgrade_time_disable_inflation is the time at which to disable mint and kavadist module inflation. If set to 0, inflation will be disabled from block 1. |
+| `staking_rewards_per_second` | [string](#string) |  | staking_rewards_per_second is the amount paid out to delegators each block from the community account |
+| `upgrade_time_set_staking_rewards_per_second` | [string](#string) |  | upgrade_time_set_staking_rewards_per_second is the initial staking_rewards_per_second to set and use when the disable inflation time is reached |
+
+
+
+
+
+ <!-- end messages -->
+
+ <!-- end enums -->
+
+ <!-- end HasExtensions -->
+
+ <!-- end services -->
+
+
+
+<a name="kava/community/v1beta1/staking.proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## kava/community/v1beta1/staking.proto
+
+
+
+<a name="kava.community.v1beta1.StakingRewardsState"></a>
+
+### StakingRewardsState
+StakingRewardsState represents the state of staking reward accumulation between blocks.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `last_accumulation_time` | [google.protobuf.Timestamp](#google.protobuf.Timestamp) |  | last_accumulation_time represents the last block time which rewards where calculated and distributed. This may be zero to signal accumulation should start on the next interval. |
+| `last_truncation_error` | [string](#string) |  | accumulated_truncation_error represents the sum of previous errors due to truncation on payout This value will always be on the interval [0, 1). |
+
+
+
+
+
+ <!-- end messages -->
+
+ <!-- end enums -->
+
+ <!-- end HasExtensions -->
+
+ <!-- end services -->
+
+
+
+<a name="kava/community/v1beta1/genesis.proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## kava/community/v1beta1/genesis.proto
+
+
+
+<a name="kava.community.v1beta1.GenesisState"></a>
+
+### GenesisState
+GenesisState defines the community module's genesis state.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `params` | [Params](#kava.community.v1beta1.Params) |  | params defines all the paramaters related to commmunity |
+| `staking_rewards_state` | [StakingRewardsState](#kava.community.v1beta1.StakingRewardsState) |  | StakingRewardsState stores the internal staking reward data required to track staking rewards across blocks |
+
+
+
+
+
+ <!-- end messages -->
+
+ <!-- end enums -->
+
+ <!-- end HasExtensions -->
+
+ <!-- end services -->
+
+
+
 <a name="kava/community/v1beta1/proposal.proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -2977,6 +3089,31 @@ CommunityPoolLendWithdrawProposal withdraws a lend position back to the communit
 
 
 
+<a name="kava.community.v1beta1.QueryAnnualizedRewardsRequest"></a>
+
+### QueryAnnualizedRewardsRequest
+QueryAnnualizedRewardsRequest defines the request type for querying the annualized rewards.
+
+
+
+
+
+
+<a name="kava.community.v1beta1.QueryAnnualizedRewardsResponse"></a>
+
+### QueryAnnualizedRewardsResponse
+QueryAnnualizedRewardsResponse defines the response type for querying the annualized rewards.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `staking_rewards` | [string](#string) |  | staking_rewards is the calculated annualized staking rewards percentage rate |
+
+
+
+
+
+
 <a name="kava.community.v1beta1.QueryBalanceRequest"></a>
 
 ### QueryBalanceRequest
@@ -2996,6 +3133,31 @@ QueryBalanceResponse defines the response type for querying x/community balance.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | `coins` | [cosmos.base.v1beta1.Coin](#cosmos.base.v1beta1.Coin) | repeated |  |
+
+
+
+
+
+
+<a name="kava.community.v1beta1.QueryParamsRequest"></a>
+
+### QueryParamsRequest
+QueryParams defines the request type for querying x/community params.
+
+
+
+
+
+
+<a name="kava.community.v1beta1.QueryParamsResponse"></a>
+
+### QueryParamsResponse
+QueryParamsResponse defines the response type for querying x/community params.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `params` | [Params](#kava.community.v1beta1.Params) |  | params represents the community module parameters |
 
 
 
@@ -3041,8 +3203,10 @@ Query defines the gRPC querier service for x/community.
 
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
+| `Params` | [QueryParamsRequest](#kava.community.v1beta1.QueryParamsRequest) | [QueryParamsResponse](#kava.community.v1beta1.QueryParamsResponse) | Params queires the module params. | GET|/kava/community/v1beta1/params|
 | `Balance` | [QueryBalanceRequest](#kava.community.v1beta1.QueryBalanceRequest) | [QueryBalanceResponse](#kava.community.v1beta1.QueryBalanceResponse) | Balance queries the balance of all coins of x/community module. | GET|/kava/community/v1beta1/balance|
 | `TotalBalance` | [QueryTotalBalanceRequest](#kava.community.v1beta1.QueryTotalBalanceRequest) | [QueryTotalBalanceResponse](#kava.community.v1beta1.QueryTotalBalanceResponse) | TotalBalance queries the balance of all coins, including x/distribution, x/community, and supplied balances. | GET|/kava/community/v1beta1/total_balance|
+| `AnnualizedRewards` | [QueryAnnualizedRewardsRequest](#kava.community.v1beta1.QueryAnnualizedRewardsRequest) | [QueryAnnualizedRewardsResponse](#kava.community.v1beta1.QueryAnnualizedRewardsResponse) | AnnualizedRewards calculates and returns the current annualized reward percentages, like staking rewards, for the chain. | GET|/kava/community/v1beta1/annualized_rewards|
 
  <!-- end services -->
 
@@ -3080,6 +3244,32 @@ MsgFundCommunityPoolResponse defines the Msg/FundCommunityPool response type.
 
 
 
+
+<a name="kava.community.v1beta1.MsgUpdateParams"></a>
+
+### MsgUpdateParams
+MsgUpdateParams allows an account to update the community module parameters.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `authority` | [string](#string) |  | authority is the address that controls the module (defaults to x/gov unless overwritten). |
+| `params` | [Params](#kava.community.v1beta1.Params) |  | params defines the x/community parameters to update. |
+
+
+
+
+
+
+<a name="kava.community.v1beta1.MsgUpdateParamsResponse"></a>
+
+### MsgUpdateParamsResponse
+MsgUpdateParamsResponse defines the Msg/UpdateParams response type.
+
+
+
+
+
  <!-- end messages -->
 
  <!-- end enums -->
@@ -3095,6 +3285,7 @@ Msg defines the community Msg service.
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
 | `FundCommunityPool` | [MsgFundCommunityPool](#kava.community.v1beta1.MsgFundCommunityPool) | [MsgFundCommunityPoolResponse](#kava.community.v1beta1.MsgFundCommunityPoolResponse) | FundCommunityPool defines a method to allow an account to directly fund the community module account. | |
+| `UpdateParams` | [MsgUpdateParams](#kava.community.v1beta1.MsgUpdateParams) | [MsgUpdateParamsResponse](#kava.community.v1beta1.MsgUpdateParamsResponse) | UpdateParams defines a method to allow an account to update the community module parameters. | |
 
  <!-- end services -->
 

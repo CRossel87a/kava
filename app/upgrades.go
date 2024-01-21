@@ -2,250 +2,264 @@ package app
 
 import (
 	"fmt"
+	"time"
 
-	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	sdkmath "cosmossdk.io/math"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
-
-	evmkeeper "github.com/evmos/ethermint/x/evm/keeper"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
-
+	"github.com/cosmos/cosmos-sdk/x/authz"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	upgradetypes "github.com/cosmos/cosmos-sdk/x/upgrade/types"
-	committeekeeper "github.com/kava-labs/kava/x/committee/keeper"
-	committeetypes "github.com/kava-labs/kava/x/committee/types"
-	evmutilkeeper "github.com/kava-labs/kava/x/evmutil/keeper"
-	evmutiltypes "github.com/kava-labs/kava/x/evmutil/types"
+
+	communitytypes "github.com/kava-labs/kava/x/community/types"
+	kavadisttypes "github.com/kava-labs/kava/x/kavadist/types"
 )
 
 const (
-	MainnetUpgradeName = "v0.24.0"
-	TestnetUpgradeName = "v0.24.0-alpha.0"
-
-	MainnetAtomDenom = "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2"
-	TestnetHardDenom = "hard"
-
-	MainnetStabilityCommitteeId = uint64(1)
-	TestnetStabilityCommitteeId = uint64(1)
+	UpgradeName_Mainnet = "v0.25.0"
+	UpgradeName_Testnet = "v0.25.0-alpha.0"
+	UpgradeName_E2ETest = "v0.25.0-testing"
 )
 
 var (
-	// Committee permission for changing AllowedCosmosDenoms param
-	AllowedParamsChangeAllowedCosmosDenoms = committeetypes.AllowedParamsChange{
-		Subspace: evmutiltypes.ModuleName,
-		Key:      "AllowedCosmosDenoms",
-	}
+	// KAVA to ukava - 6 decimals
+	kavaConversionFactor = sdk.NewInt(1000_000)
+	secondsPerYear       = sdk.NewInt(365 * 24 * 60 * 60)
 
-	// EIP712 allowed message for MsgConvertCosmosCoinToERC20
-	EIP712AllowedMsgConvertCosmosCoinToERC20 = evmtypes.EIP712AllowedMsg{
-		MsgTypeUrl:       "/kava.evmutil.v1beta1.MsgConvertCosmosCoinToERC20",
-		MsgValueTypeName: "MsgConvertCosmosCoinToERC20",
-		ValueTypes: []evmtypes.EIP712MsgAttrType{
-			{
-				Name: "initiator",
-				Type: "string",
-			},
-			{
-				Name: "receiver",
-				Type: "string",
-			},
-			{
-				Name: "amount",
-				Type: "Coin",
-			},
-		},
-		NestedTypes: nil,
-	}
-	// EIP712 allowed message for MsgConvertCosmosCoinFromERC20
-	EIP712AllowedMsgConvertCosmosCoinFromERC20 = evmtypes.EIP712AllowedMsg{
-		MsgTypeUrl:       "/kava.evmutil.v1beta1.MsgConvertCosmosCoinFromERC20",
-		MsgValueTypeName: "MsgConvertCosmosCoinFromERC20",
-		ValueTypes: []evmtypes.EIP712MsgAttrType{
-			{
-				Name: "initiator",
-				Type: "string",
-			},
-			{
-				Name: "receiver",
-				Type: "string",
-			},
-			{
-				Name: "amount",
-				Type: "Coin",
-			},
-		},
-		NestedTypes: nil,
-	}
+	// 10 Million KAVA per year in staking rewards, inflation disable time 2024-01-01T00:00:00 UTC
+	CommunityParams_Mainnet = communitytypes.NewParams(
+		time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		// before switchover
+		sdkmath.LegacyZeroDec(),
+		// after switchover - 10M KAVA to ukava per year / seconds per year
+		sdkmath.LegacyNewDec(10_000_000).
+			MulInt(kavaConversionFactor).
+			QuoInt(secondsPerYear),
+	)
+
+	// Testnet -- 15 Trillion KAVA per year in staking rewards, inflation disable time 2023-11-16T00:00:00 UTC
+	CommunityParams_Testnet = communitytypes.NewParams(
+		time.Date(2023, 11, 16, 0, 0, 0, 0, time.UTC),
+		// before switchover
+		sdkmath.LegacyZeroDec(),
+		// after switchover
+		sdkmath.LegacyNewDec(15_000_000).
+			MulInt64(1_000_000). // 15M * 1M = 15T
+			MulInt(kavaConversionFactor).
+			QuoInt(secondsPerYear),
+	)
+
+	CommunityParams_E2E = communitytypes.NewParams(
+		time.Now().Add(10*time.Second).UTC(), // relative time for testing
+		sdkmath.LegacyNewDec(0),              // stakingRewardsPerSecond
+		sdkmath.LegacyNewDec(1000),           // upgradeTimeSetstakingRewardsPerSecond
+	)
+
+	// ValidatorMinimumCommission is the new 5% minimum commission rate for validators
+	ValidatorMinimumCommission = sdk.NewDecWithPrec(5, 2)
 )
 
+// RegisterUpgradeHandlers registers the upgrade handlers for the app.
 func (app App) RegisterUpgradeHandlers() {
-	// register upgrade handler for mainnet
-	app.upgradeKeeper.SetUpgradeHandler(MainnetUpgradeName, MainnetUpgradeHandler(app))
-
-	// register upgrade handler for testnet
-	app.upgradeKeeper.SetUpgradeHandler(TestnetUpgradeName, TestnetUpgradeHandler(app))
+	app.upgradeKeeper.SetUpgradeHandler(
+		UpgradeName_Mainnet,
+		upgradeHandler(app, UpgradeName_Mainnet, CommunityParams_Mainnet),
+	)
+	app.upgradeKeeper.SetUpgradeHandler(
+		UpgradeName_Testnet,
+		upgradeHandler(app, UpgradeName_Testnet, CommunityParams_Testnet),
+	)
+	app.upgradeKeeper.SetUpgradeHandler(
+		UpgradeName_E2ETest,
+		upgradeHandler(app, UpgradeName_Testnet, CommunityParams_E2E),
+	)
 
 	upgradeInfo, err := app.upgradeKeeper.ReadUpgradeInfoFromDisk()
 	if err != nil {
 		panic(err)
 	}
 
-	doUpgrade := upgradeInfo.Name == MainnetUpgradeName || upgradeInfo.Name == TestnetUpgradeName
+	doUpgrade := upgradeInfo.Name == UpgradeName_Mainnet ||
+		upgradeInfo.Name == UpgradeName_Testnet ||
+		upgradeInfo.Name == UpgradeName_E2ETest
+
 	if doUpgrade && !app.upgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
-		storeUpgrades := storetypes.StoreUpgrades{}
+		storeUpgrades := storetypes.StoreUpgrades{
+			Added: []string{
+				// x/community added store
+				communitytypes.ModuleName,
+			},
+		}
 
 		// configure store loader that checks if version == upgradeHeight and applies store upgrades
 		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, &storeUpgrades))
 	}
 }
 
-func MainnetUpgradeHandler(app App) upgradetypes.UpgradeHandler {
-	return func(ctx sdk.Context, plan upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
-		app.Logger().Info("running mainnet upgrade handler")
+// upgradeHandler returns an UpgradeHandler for the given upgrade parameters.
+func upgradeHandler(
+	app App,
+	name string,
+	communityParams communitytypes.Params,
+) upgradetypes.UpgradeHandler {
+	return func(
+		ctx sdk.Context,
+		plan upgradetypes.Plan,
+		fromVM module.VersionMap,
+	) (module.VersionMap, error) {
+		app.Logger().Info(fmt.Sprintf("running %s upgrade handler", name))
 
 		toVM, err := app.mm.RunMigrations(ctx, app.configurator, fromVM)
 		if err != nil {
 			return toVM, err
 		}
 
-		app.Logger().Info("initializing allowed_cosmos_denoms param of x/evmutil")
-		allowedDenoms := []evmutiltypes.AllowedCosmosCoinERC20Token{
-			{
-				CosmosDenom: MainnetAtomDenom,
-				// erc20 contract metadata
-				Name:     "ATOM",
-				Symbol:   "ATOM",
-				Decimals: 6,
-			},
-		}
-		InitializeEvmutilAllowedCosmosDenoms(ctx, &app.evmutilKeeper, allowedDenoms)
+		//
+		// Staking validator minimum commission
+		//
+		UpdateValidatorMinimumCommission(ctx, app)
 
-		app.Logger().Info("allowing cosmos coin conversion messaged in EIP712 signing")
-		AllowEip712SigningForConvertMessages(ctx, app.evmKeeper)
-
-		app.Logger().Info("allowing stability committee to update x/evmutil AllowedCosmosDenoms param")
-		AddAllowedCosmosDenomsParamChangeToStabilityCommittee(
-			ctx,
-			app.interfaceRegistry,
-			&app.committeeKeeper,
-			MainnetStabilityCommitteeId,
+		//
+		// Community Params
+		//
+		app.communityKeeper.SetParams(ctx, communityParams)
+		app.Logger().Info(
+			"initialized x/community params",
+			"UpgradeTimeDisableInflation", communityParams.UpgradeTimeDisableInflation,
+			"StakingRewardsPerSecond", communityParams.StakingRewardsPerSecond,
+			"UpgradeTimeSetStakingRewardsPerSecond", communityParams.UpgradeTimeSetStakingRewardsPerSecond,
 		)
 
-		return toVM, nil
-	}
-}
-
-func TestnetUpgradeHandler(app App) upgradetypes.UpgradeHandler {
-	return func(ctx sdk.Context, plan upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
-		app.Logger().Info("running testnet upgrade handler")
-
-		toVM, err := app.mm.RunMigrations(ctx, app.configurator, fromVM)
+		//
+		// Kavadist gov grant
+		//
+		msgGrant, err := authz.NewMsgGrant(
+			app.accountKeeper.GetModuleAddress(kavadisttypes.ModuleName),        // granter
+			app.accountKeeper.GetModuleAddress(govtypes.ModuleName),             // grantee
+			authz.NewGenericAuthorization(sdk.MsgTypeURL(&banktypes.MsgSend{})), // authorization
+			nil, // expiration
+		)
 		if err != nil {
 			return toVM, err
 		}
-
-		app.Logger().Info("initializing allowed_cosmos_denoms param of x/evmutil")
-		// on testnet, IBC is not enabled. we initialize HARD tokens for conversion to EVM.
-		allowedDenoms := []evmutiltypes.AllowedCosmosCoinERC20Token{
-			{
-				CosmosDenom: TestnetHardDenom,
-				// erc20 contract metadata
-				Name:     "HARD",
-				Symbol:   "HARD",
-				Decimals: 6,
-			},
+		_, err = app.authzKeeper.Grant(ctx, msgGrant)
+		if err != nil {
+			return toVM, err
 		}
-		InitializeEvmutilAllowedCosmosDenoms(ctx, &app.evmutilKeeper, allowedDenoms)
+		app.Logger().Info("created gov grant for kavadist funds")
 
-		app.Logger().Info("allowing cosmos coin conversion messaged in EIP712 signing")
-		AllowEip712SigningForConvertMessages(ctx, app.evmKeeper)
+		//
+		// Gov Quorum
+		//
+		govTallyParams := app.govKeeper.GetTallyParams(ctx)
+		oldQuorum := govTallyParams.Quorum
+		govTallyParams.Quorum = sdkmath.LegacyMustNewDecFromStr("0.2").String()
+		app.govKeeper.SetTallyParams(ctx, govTallyParams)
+		app.Logger().Info(fmt.Sprintf("updated tally quorum from %s to %s", oldQuorum, govTallyParams.Quorum))
 
-		app.Logger().Info("allowing stability committee to update x/evmutil AllowedCosmosDenoms param")
-		AddAllowedCosmosDenomsParamChangeToStabilityCommittee(
-			ctx,
-			app.interfaceRegistry,
-			&app.committeeKeeper,
-			TestnetStabilityCommitteeId,
-		)
+		//
+		// Incentive Params
+		//
+		UpdateIncentiveParams(ctx, app)
 
 		return toVM, nil
 	}
 }
 
-// InitializeEvmutilAllowedCosmosDenoms sets the AllowedCosmosDenoms parameter of the x/evmutil module.
-// This new parameter controls what cosmos denoms are allowed to be converted to ERC20 tokens.
-func InitializeEvmutilAllowedCosmosDenoms(
+// UpdateValidatorMinimumCommission updates the commission rate for all
+// validators to be at least the new min commission rate, and sets the minimum
+// commission rate in the staking params.
+func UpdateValidatorMinimumCommission(
 	ctx sdk.Context,
-	evmutilKeeper *evmutilkeeper.Keeper,
-	allowedCoins []evmutiltypes.AllowedCosmosCoinERC20Token,
+	app App,
 ) {
-	params := evmutilKeeper.GetParams(ctx)
-	params.AllowedCosmosDenoms = allowedCoins
-	if err := params.Validate(); err != nil {
-		panic(fmt.Sprintf("x/evmutil params are not valid: %s", err))
-	}
-	evmutilKeeper.SetParams(ctx, params)
-}
+	resultCount := make(map[stakingtypes.BondStatus]int)
 
-// AllowEip712SigningForConvertMessages adds the cosmos coin conversion messages to the
-// allowed message types for EIP712 signing.
-// The newly allowed messages are:
-// - MsgConvertCosmosCoinToERC20
-// - MsgConvertCosmosCoinFromERC20
-func AllowEip712SigningForConvertMessages(ctx sdk.Context, evmKeeper *evmkeeper.Keeper) {
-	params := evmKeeper.GetParams(ctx)
-	params.EIP712AllowedMsgs = append(
-		params.EIP712AllowedMsgs,
-		EIP712AllowedMsgConvertCosmosCoinToERC20,
-		EIP712AllowedMsgConvertCosmosCoinFromERC20,
+	// Iterate over *all* validators including inactive
+	app.stakingKeeper.IterateValidators(
+		ctx,
+		func(index int64, validator stakingtypes.ValidatorI) (stop bool) {
+			// Skip if validator commission is already >= 5%
+			if validator.GetCommission().GTE(ValidatorMinimumCommission) {
+				return false
+			}
+
+			val, ok := validator.(stakingtypes.Validator)
+			if !ok {
+				panic("expected stakingtypes.Validator")
+			}
+
+			// Set minimum commission rate to 5%, when commission is < 5%
+			val.Commission.Rate = ValidatorMinimumCommission
+			val.Commission.UpdateTime = ctx.BlockTime()
+
+			// Update MaxRate if necessary
+			if val.Commission.MaxRate.LT(ValidatorMinimumCommission) {
+				val.Commission.MaxRate = ValidatorMinimumCommission
+			}
+
+			if err := app.stakingKeeper.BeforeValidatorModified(ctx, val.GetOperator()); err != nil {
+				panic(fmt.Sprintf("failed to call BeforeValidatorModified: %s", err))
+			}
+			app.stakingKeeper.SetValidator(ctx, val)
+
+			// Keep track of counts just for logging purposes
+			switch val.GetStatus() {
+			case stakingtypes.Bonded:
+				resultCount[stakingtypes.Bonded]++
+			case stakingtypes.Unbonded:
+				resultCount[stakingtypes.Unbonded]++
+			case stakingtypes.Unbonding:
+				resultCount[stakingtypes.Unbonding]++
+			}
+
+			return false
+		},
 	)
-	if err := params.Validate(); err != nil {
-		panic(fmt.Sprintf("x/evm params are not valid: %s", err))
-	}
-	evmKeeper.SetParams(ctx, params)
+
+	app.Logger().Info(
+		"updated validator minimum commission rate for all existing validators",
+		stakingtypes.BondStatusBonded, resultCount[stakingtypes.Bonded],
+		stakingtypes.BondStatusUnbonded, resultCount[stakingtypes.Unbonded],
+		stakingtypes.BondStatusUnbonding, resultCount[stakingtypes.Unbonding],
+	)
+
+	stakingParams := app.stakingKeeper.GetParams(ctx)
+	stakingParams.MinCommissionRate = ValidatorMinimumCommission
+	app.stakingKeeper.SetParams(ctx, stakingParams)
+
+	app.Logger().Info(
+		"updated x/staking params minimum commission rate",
+		"MinCommissionRate", stakingParams.MinCommissionRate,
+	)
 }
 
-// AddAllowedCosmosDenomsParamChangeToStabilityCommittee enables the stability committee
-// to update the AllowedCosmosDenoms parameter of x/evmutil.
-func AddAllowedCosmosDenomsParamChangeToStabilityCommittee(
+// UpdateIncentiveParams modifies the earn rewards period for bkava to be 600K KAVA per year.
+func UpdateIncentiveParams(
 	ctx sdk.Context,
-	cdc codectypes.InterfaceRegistry,
-	committeeKeeper *committeekeeper.Keeper,
-	committeeId uint64,
+	app App,
 ) {
-	// get committee
-	committee, foundCommittee := committeeKeeper.GetCommittee(ctx, committeeId)
-	if !foundCommittee {
-		panic(fmt.Sprintf("expected to find committee with id %d but found none", committeeId))
-	}
+	incentiveParams := app.incentiveKeeper.GetParams(ctx)
 
-	permissions := committee.GetPermissions()
+	// bkava annualized rewards: 600K KAVA
+	newAmount := sdkmath.LegacyNewDec(600_000).
+		MulInt(kavaConversionFactor).
+		QuoInt(secondsPerYear).
+		TruncateInt()
 
-	// find & update the ParamsChangePermission
-	foundPermission := false
-	for i, permission := range permissions {
-		if paramsChangePermission, ok := permission.(*committeetypes.ParamsChangePermission); ok {
-			foundPermission = true
-			paramsChangePermission.AllowedParamsChanges = append(
-				paramsChangePermission.AllowedParamsChanges,
-				AllowedParamsChangeAllowedCosmosDenoms,
-			)
-			permissions[i] = paramsChangePermission
-			break
+	for i := range incentiveParams.EarnRewardPeriods {
+		if incentiveParams.EarnRewardPeriods[i].CollateralType != "bkava" {
+			continue
 		}
+
+		// Update rewards per second via index
+		incentiveParams.EarnRewardPeriods[i].RewardsPerSecond = sdk.NewCoins(
+			sdk.NewCoin("ukava", newAmount),
+		)
 	}
 
-	// error if permission was not found & updated
-	if !foundPermission {
-		panic(fmt.Sprintf("no ParamsChangePermission found on committee with id %d", committeeId))
-	}
-
-	// update permissions
-	committee.SetPermissions(permissions)
-	if err := committee.Validate(); err != nil {
-		panic(fmt.Sprintf("stability committee (id=%d) is invalid: %s", committeeId, err))
-	}
-
-	// save permission changes
-	committeeKeeper.SetCommittee(ctx, committee)
+	app.incentiveKeeper.SetParams(ctx, incentiveParams)
 }

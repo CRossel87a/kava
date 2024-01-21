@@ -139,6 +139,8 @@ import (
 	"github.com/kava-labs/kava/x/liquid"
 	liquidkeeper "github.com/kava-labs/kava/x/liquid/keeper"
 	liquidtypes "github.com/kava-labs/kava/x/liquid/types"
+	metrics "github.com/kava-labs/kava/x/metrics"
+	metricstypes "github.com/kava-labs/kava/x/metrics/types"
 	pricefeed "github.com/kava-labs/kava/x/pricefeed"
 	pricefeedkeeper "github.com/kava-labs/kava/x/pricefeed/keeper"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
@@ -216,6 +218,7 @@ var (
 		router.AppModuleBasic{},
 		mint.AppModuleBasic{},
 		community.AppModuleBasic{},
+		metrics.AppModuleBasic{},
 	)
 
 	// module account permissions
@@ -248,8 +251,10 @@ var (
 )
 
 // Verify app interface at compile time
-var _ servertypes.Application = (*App)(nil)
-var _ servertypes.ApplicationQueryService = (*App)(nil)
+var (
+	_ servertypes.Application             = (*App)(nil)
+	_ servertypes.ApplicationQueryService = (*App)(nil)
+)
 
 // Options bundles several configuration params for an App.
 type Options struct {
@@ -261,6 +266,7 @@ type Options struct {
 	MempoolAuthAddresses  []sdk.AccAddress
 	EVMTrace              string
 	EVMMaxGasWanted       uint64
+	TelemetryOptions      metricstypes.TelemetryOptions
 }
 
 // DefaultOptions is a sensible default Options value.
@@ -368,12 +374,15 @@ func NewApp(
 		evmtypes.StoreKey, feemarkettypes.StoreKey, authzkeeper.StoreKey,
 		capabilitytypes.StoreKey, kavadisttypes.StoreKey, auctiontypes.StoreKey,
 		issuancetypes.StoreKey, bep3types.StoreKey, pricefeedtypes.StoreKey,
-		swaptypes.StoreKey, cdptypes.StoreKey, hardtypes.StoreKey,
+		swaptypes.StoreKey, cdptypes.StoreKey, hardtypes.StoreKey, communitytypes.StoreKey,
 		committeetypes.StoreKey, incentivetypes.StoreKey, evmutiltypes.StoreKey,
 		savingstypes.StoreKey, earntypes.StoreKey, minttypes.StoreKey,
 	)
 	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey, evmtypes.TransientKey, feemarkettypes.TransientKey)
 	memKeys := sdk.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
+
+	// Authority for gov proposals, using the x/gov module account address
+	govAuthorityAddr := authtypes.NewModuleAddress(govtypes.ModuleName)
 
 	app := &App{
 		BaseApp:           bApp,
@@ -481,8 +490,7 @@ func NewApp(
 		appCodec,
 		homePath,
 		app.BaseApp,
-		// Authority
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthorityAddr.String(),
 	)
 	app.evidenceKeeper = *evidencekeeper.NewKeeper(
 		appCodec,
@@ -503,8 +511,7 @@ func NewApp(
 	// Create Ethermint keepers
 	app.feeMarketKeeper = feemarketkeeper.NewKeeper(
 		appCodec,
-		// Authority
-		authtypes.NewModuleAddress(govtypes.ModuleName),
+		govAuthorityAddr,
 		keys[feemarkettypes.StoreKey],
 		tkeys[feemarkettypes.TransientKey],
 		feemarketSubspace,
@@ -521,8 +528,7 @@ func NewApp(
 	evmBankKeeper := evmutilkeeper.NewEvmBankKeeper(app.evmutilKeeper, app.bankKeeper, app.accountKeeper)
 	app.evmKeeper = evmkeeper.NewKeeper(
 		appCodec, keys[evmtypes.StoreKey], tkeys[evmtypes.TransientKey],
-		// Authority
-		authtypes.NewModuleAddress(govtypes.ModuleName),
+		govAuthorityAddr,
 		app.accountKeeper, evmBankKeeper, app.stakingKeeper, app.feeMarketKeeper,
 		nil, // precompiled contracts
 		geth.NewEVM,
@@ -631,14 +637,6 @@ func NewApp(
 		&app.distrKeeper,
 	)
 
-	// x/community's deposit/withdraw to lend proposals depend on hard keeper.
-	app.communityKeeper = communitykeeper.NewKeeper(
-		app.accountKeeper,
-		app.bankKeeper,
-		&cdpKeeper,
-		app.distrKeeper,
-		&hardKeeper,
-	)
 	app.kavadistKeeper = kavadistkeeper.NewKeeper(
 		appCodec,
 		keys[kavadisttypes.StoreKey],
@@ -657,6 +655,21 @@ func NewApp(
 		app.accountKeeper,
 		app.bankKeeper,
 		authtypes.FeeCollectorName,
+	)
+
+	// x/community's deposit/withdraw to lend proposals depend on hard keeper.
+	app.communityKeeper = communitykeeper.NewKeeper(
+		appCodec,
+		keys[communitytypes.StoreKey],
+		app.accountKeeper,
+		app.bankKeeper,
+		&cdpKeeper,
+		app.distrKeeper,
+		&hardKeeper,
+		&app.mintKeeper,
+		&app.kavadistKeeper,
+		app.stakingKeeper,
+		govAuthorityAddr,
 	)
 
 	app.incentiveKeeper = incentivekeeper.NewKeeper(
@@ -782,7 +795,7 @@ func NewApp(
 		hard.NewAppModule(app.hardKeeper, app.accountKeeper, app.bankKeeper, app.pricefeedKeeper),
 		committee.NewAppModule(app.committeeKeeper, app.accountKeeper),
 		incentive.NewAppModule(app.incentiveKeeper, app.accountKeeper, app.bankKeeper, app.cdpKeeper),
-		evmutil.NewAppModule(app.evmutilKeeper, app.bankKeeper),
+		evmutil.NewAppModule(app.evmutilKeeper, app.bankKeeper, app.accountKeeper),
 		savings.NewAppModule(app.savingsKeeper, app.accountKeeper, app.bankKeeper),
 		liquid.NewAppModule(app.liquidKeeper),
 		earn.NewAppModule(app.earnKeeper, app.accountKeeper, app.bankKeeper),
@@ -790,10 +803,12 @@ func NewApp(
 		// nil InflationCalculationFn, use SDK's default inflation function
 		mint.NewAppModule(appCodec, app.mintKeeper, app.accountKeeper, nil),
 		community.NewAppModule(app.communityKeeper, app.accountKeeper),
+		metrics.NewAppModule(options.TelemetryOptions),
 	)
 
 	// Warning: Some begin blockers must run before others. Ensure the dependencies are understood before modifying this list.
 	app.mm.SetOrderBeginBlockers(
+		metricstypes.ModuleName,
 		// Upgrade begin blocker runs migrations on the first block after an upgrade. It should run before any other module.
 		upgradetypes.ModuleName,
 		// Capability begin blocker runs non state changing initialization.
@@ -801,6 +816,9 @@ func NewApp(
 		// Committee begin blocker changes module params by enacting proposals.
 		// Run before to ensure params are updated together before state changes.
 		committeetypes.ModuleName,
+		// Community begin blocker should run before x/mint and x/kavadist since
+		// the disable inflation upgrade will update those modules' params.
+		communitytypes.ModuleName,
 		minttypes.ModuleName,
 		distrtypes.ModuleName,
 		// During begin block slashing happens after distr.BeginBlocker so that
@@ -812,7 +830,6 @@ func NewApp(
 		feemarkettypes.ModuleName,
 		evmtypes.ModuleName,
 		kavadisttypes.ModuleName,
-		communitytypes.ModuleName,
 		// Auction begin blocker will close out expired auctions and pay debt back to cdp.
 		// It should be run before cdp begin blocker which cancels out debt with stable and starts more auctions.
 		auctiontypes.ModuleName,
@@ -882,6 +899,7 @@ func NewApp(
 		routertypes.ModuleName,
 		minttypes.ModuleName,
 		communitytypes.ModuleName,
+		metricstypes.ModuleName,
 	)
 
 	// Warning: Some init genesis methods must run before others. Ensure the dependencies are understood before modifying this list
@@ -923,6 +941,7 @@ func NewApp(
 		validatorvestingtypes.ModuleName,
 		liquidtypes.ModuleName,
 		routertypes.ModuleName,
+		metricstypes.ModuleName,
 	)
 
 	app.mm.RegisterInvariants(&app.crisisKeeper)

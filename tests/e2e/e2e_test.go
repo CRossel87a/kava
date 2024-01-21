@@ -41,7 +41,7 @@ func TestIntegrationTestSuite(t *testing.T) {
 
 // example test that queries kava via SDK and EVM
 func (suite *IntegrationTestSuite) TestChainID() {
-	expectedEvmNetworkId, err := emtypes.ParseChainID(suite.Kava.ChainId)
+	expectedEvmNetworkId, err := emtypes.ParseChainID(suite.Kava.ChainID)
 	suite.NoError(err)
 
 	// EVM query
@@ -52,12 +52,12 @@ func (suite *IntegrationTestSuite) TestChainID() {
 	// SDK query
 	nodeInfo, err := suite.Kava.Tm.GetNodeInfo(context.Background(), &tmservice.GetNodeInfoRequest{})
 	suite.NoError(err)
-	suite.Equal(suite.Kava.ChainId, nodeInfo.DefaultNodeInfo.Network)
+	suite.Equal(suite.Kava.ChainID, nodeInfo.DefaultNodeInfo.Network)
 }
 
 // example test that funds a new account & queries its balance
 func (suite *IntegrationTestSuite) TestFundedAccount() {
-	funds := ukava(1e7)
+	funds := ukava(1e3)
 	acc := suite.Kava.NewFundedAccount("example-acc", sdk.NewCoins(funds))
 
 	// check that the sdk & evm signers are for the same account
@@ -80,7 +80,7 @@ func (suite *IntegrationTestSuite) TestFundedAccount() {
 // example test that signs & broadcasts an EVM tx
 func (suite *IntegrationTestSuite) TestTransferOverEVM() {
 	// fund an account that can perform the transfer
-	initialFunds := ukava(1e7) // 10 KAVA
+	initialFunds := ukava(1e6) // 1 KAVA
 	acc := suite.Kava.NewFundedAccount("evm-test-transfer", sdk.NewCoins(initialFunds))
 
 	// get a rando account to send kava to
@@ -93,13 +93,13 @@ func (suite *IntegrationTestSuite) TestTransferOverEVM() {
 	suite.Equal(uint64(0), nonce) // sanity check. the account should have no prior txs
 
 	// transfer kava over EVM
-	kavaToTransfer := big.NewInt(1e18) // 1 KAVA; akava has 18 decimals.
+	kavaToTransfer := big.NewInt(1e17) // .1 KAVA; akava has 18 decimals.
 	req := util.EvmTxRequest{
 		Tx:   ethtypes.NewTransaction(nonce, to, kavaToTransfer, 1e5, minEvmGasPrice, nil),
 		Data: "any ol' data to track this through the system",
 	}
 	res := acc.SignAndBroadcastEvmTx(req)
-	suite.NoError(res.Err)
+	suite.Require().NoError(res.Err)
 	suite.Equal(ethtypes.ReceiptStatusSuccessful, res.Receipt.Status)
 
 	// evm txs refund unused gas. so to know the expected balance we need to know how much gas was used.
@@ -109,7 +109,7 @@ func (suite *IntegrationTestSuite) TestTransferOverEVM() {
 
 	// expect (9 - gas used) KAVA remaining in account.
 	balance := suite.Kava.QuerySdkForBalances(acc.SdkAddress)
-	suite.Equal(sdkmath.NewInt(9e6).Sub(ukavaUsedForGas), balance.AmountOf("ukava"))
+	suite.Equal(sdkmath.NewInt(9e5).Sub(ukavaUsedForGas), balance.AmountOf("ukava"))
 }
 
 // TestIbcTransfer transfers KAVA from the primary kava chain (suite.Kava) to the ibc chain (suite.Ibc).
@@ -119,15 +119,15 @@ func (suite *IntegrationTestSuite) TestIbcTransfer() {
 
 	// ARRANGE
 	// setup kava account
-	funds := ukava(1e7) // 10 KAVA
+	funds := ukava(1e5) // .1 KAVA
 	kavaAcc := suite.Kava.NewFundedAccount("ibc-transfer-kava-side", sdk.NewCoins(funds))
 	// setup ibc account
 	ibcAcc := suite.Ibc.NewFundedAccount("ibc-transfer-ibc-side", sdk.NewCoins())
 
 	gasLimit := int64(2e5)
-	fee := ukava(7500)
+	fee := ukava(200)
 
-	fundsToSend := ukava(5e6) // 5 KAVA
+	fundsToSend := ukava(5e4) // .005 KAVA
 	transferMsg := ibctypes.NewMsgTransfer(
 		testutil.IbcPort,
 		testutil.IbcChannel,

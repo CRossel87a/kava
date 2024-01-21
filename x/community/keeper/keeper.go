@@ -3,25 +3,50 @@ package keeper
 import (
 	"fmt"
 
+	"github.com/cosmos/cosmos-sdk/codec"
+	storetypes "github.com/cosmos/cosmos-sdk/store/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/tendermint/tendermint/libs/log"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/kava/x/community/types"
 )
 
 // Keeper of the community store
 type Keeper struct {
-	bankKeeper    types.BankKeeper
-	cdpKeeper     types.CdpKeeper
-	distrKeeper   types.DistributionKeeper
-	hardKeeper    types.HardKeeper
-	moduleAddress sdk.AccAddress
+	key storetypes.StoreKey
+	cdc codec.Codec
+
+	accountKeeper  types.AccountKeeper
+	bankKeeper     types.BankKeeper
+	cdpKeeper      types.CdpKeeper
+	distrKeeper    types.DistributionKeeper
+	hardKeeper     types.HardKeeper
+	moduleAddress  sdk.AccAddress
+	mintKeeper     types.MintKeeper
+	kavadistKeeper types.KavadistKeeper
+	stakingKeeper  types.StakingKeeper
+
+	// the address capable of executing a MsgUpdateParams message. Typically, this
+	// should be the x/gov module account.
+	authority sdk.AccAddress
 
 	legacyCommunityPoolAddress sdk.AccAddress
 }
 
 // NewKeeper creates a new community Keeper instance
-func NewKeeper(ak types.AccountKeeper, bk types.BankKeeper, ck types.CdpKeeper, dk types.DistributionKeeper, hk types.HardKeeper) Keeper {
+func NewKeeper(
+	cdc codec.Codec,
+	key storetypes.StoreKey,
+	ak types.AccountKeeper,
+	bk types.BankKeeper,
+	ck types.CdpKeeper,
+	dk types.DistributionKeeper,
+	hk types.HardKeeper,
+	mk types.MintKeeper,
+	kk types.KavadistKeeper,
+	sk types.StakingKeeper,
+	authority sdk.AccAddress,
+) Keeper {
 	// ensure community module account is set
 	addr := ak.GetModuleAddress(types.ModuleAccountName)
 	if addr == nil {
@@ -31,16 +56,32 @@ func NewKeeper(ak types.AccountKeeper, bk types.BankKeeper, ck types.CdpKeeper, 
 	if addr == nil {
 		panic("legacy community pool address not found")
 	}
+	if err := sdk.VerifyAddressFormat(authority); err != nil {
+		panic(fmt.Sprintf("invalid authority address: %s", err))
+	}
 
 	return Keeper{
-		bankKeeper:    bk,
-		cdpKeeper:     ck,
-		distrKeeper:   dk,
-		hardKeeper:    hk,
-		moduleAddress: addr,
+		key: key,
+		cdc: cdc,
 
+		accountKeeper:  ak,
+		bankKeeper:     bk,
+		cdpKeeper:      ck,
+		distrKeeper:    dk,
+		hardKeeper:     hk,
+		mintKeeper:     mk,
+		kavadistKeeper: kk,
+		stakingKeeper:  sk,
+		moduleAddress:  addr,
+
+		authority:                  authority,
 		legacyCommunityPoolAddress: legacyAddr,
 	}
+}
+
+// GetAuthority returns the x/community module's authority.
+func (k Keeper) GetAuthority() sdk.AccAddress {
+	return k.authority
 }
 
 // Logger returns a module-specific logger.
@@ -61,4 +102,31 @@ func (k Keeper) FundCommunityPool(ctx sdk.Context, sender sdk.AccAddress, amount
 // DistributeFromCommunityPool transfers coins from the community pool to recipient.
 func (k Keeper) DistributeFromCommunityPool(ctx sdk.Context, recipient sdk.AccAddress, amount sdk.Coins) error {
 	return k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleAccountName, recipient, amount)
+}
+
+// GetStakingRewardsState returns the staking reward state or the default state if not set
+func (k Keeper) GetStakingRewardsState(ctx sdk.Context) types.StakingRewardsState {
+	store := ctx.KVStore(k.key)
+
+	b := store.Get(types.StakingRewardsStateKey)
+	if b == nil {
+		return types.DefaultStakingRewardsState()
+	}
+
+	state := types.StakingRewardsState{}
+	k.cdc.MustUnmarshal(b, &state)
+
+	return state
+}
+
+// SetStakingRewardsState validates and sets the staking rewards state in the store
+func (k Keeper) SetStakingRewardsState(ctx sdk.Context, state types.StakingRewardsState) {
+	if err := state.Validate(); err != nil {
+		panic(fmt.Sprintf("invalid state: %s", err))
+	}
+
+	store := ctx.KVStore(k.key)
+	b := k.cdc.MustMarshal(&state)
+
+	store.Set(types.StakingRewardsStateKey, b)
 }

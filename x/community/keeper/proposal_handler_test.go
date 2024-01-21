@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/suite"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -27,9 +28,11 @@ func c(denom string, amount int64) sdk.Coin { return sdk.NewInt64Coin(denom, amo
 func ukava(amt int64) sdk.Coins {
 	return sdk.NewCoins(c("ukava", amt))
 }
+
 func usdx(amt int64) sdk.Coins {
 	return sdk.NewCoins(c("usdx", amt))
 }
+
 func otherdenom(amt int64) sdk.Coins {
 	return sdk.NewCoins(c("other-denom", amt))
 }
@@ -67,10 +70,19 @@ func (suite *proposalTestSuite) SetupTest() {
 		ChainID: chainID,
 	})
 
+	// Set UpgradeTimeDisableInflation to far future to not influence module
+	// account balances
+	params := types.Params{
+		UpgradeTimeDisableInflation: time.Now().Add(100000 * time.Hour),
+		StakingRewardsPerSecond:     sdkmath.LegacyNewDec(0),
+	}
+	communityGs := types.NewGenesisState(params, types.DefaultStakingRewardsState())
+
 	tApp.InitializeFromGenesisStatesWithTimeAndChainID(
 		genTime, chainID,
 		app.GenesisState{hardtypes.ModuleName: tApp.AppCodec().MustMarshalJSON(&hardGS)},
 		app.GenesisState{pricefeedtypes.ModuleName: tApp.AppCodec().MustMarshalJSON(&pricefeedGS)},
+		app.GenesisState{types.ModuleName: tApp.AppCodec().MustMarshalJSON(&communityGs)},
 		testutil.NewCDPGenState(tApp.AppCodec(), "ukava", "kava", sdk.NewDec(2)),
 	)
 
@@ -108,10 +120,13 @@ func (suite *proposalTestSuite) FundCommunityPool(coins sdk.Coins) {
 }
 
 func (suite *proposalTestSuite) GetCommunityPoolBalance() sdk.Coins {
-	balance, change := suite.App.GetDistrKeeper().GetFeePoolCommunityCoins(suite.Ctx).TruncateDecimal()
-	// expect no decimal dust
-	suite.True(sdk.NewDecCoins().IsEqual(change), "expected no decimal dust in community pool")
-	return balance
+	ak := suite.App.GetAccountKeeper()
+	bk := suite.App.GetBankKeeper()
+
+	addr := ak.GetModuleAddress(types.ModuleAccountName)
+
+	// Return x/community module account balance, no longer using x/distribution community pool
+	return bk.GetAllBalances(suite.Ctx, addr)
 }
 
 func (suite *proposalTestSuite) CheckCommunityPoolBalance(expected sdk.Coins) {
